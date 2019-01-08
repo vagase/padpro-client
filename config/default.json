@@ -1,5 +1,13 @@
 {
   "vendor": {
-    "padpro_token": "should be provided in local.json"
+    "padproToken": "$OVERRIDE"
+  },
+  "chatBotHub": {
+    "host": "127.0.0.1",
+    "port": 13142
+  },
+  "client": {
+    "clientId": "$OVERRIDE",
+    "clientType": "WECHATBOT"
   }
 }

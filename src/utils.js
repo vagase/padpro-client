@@ -10,3 +10,9 @@ exports.printImage = async function(url) {
     const log = await terminalImage.buffer(Buffer.from(res));
     console.log(log);
 };
+
+exports.sleep = async function sleep(ms) {
+    return new Promise(resolve=>{
+        setTimeout(resolve, ms)
+    })
+};

@@ -1,7 +1,7 @@
 const printImage = require("./utils").printImage;
 const { Wechaty } = require('wechaty');
 const config = require('config');
-const WECHATY_PUPPET_PADPRO_TOKEN = config.get('vendor.padpro_token');
+const WECHATY_PUPPET_PADPRO_TOKEN = config.get('vendor.padproToken');
 
 const puppet = 'wechaty-puppet-padpro';
 const puppetOptions = {
