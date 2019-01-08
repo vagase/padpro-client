@@ -1,8 +1,8 @@
 {
   "dependencies": {
+    "config": "^3.0.1",
     "got": "^9.5.0",
     "request-promise": "^4.2.2",
-    "term-img": "^4.0.0",
     "terminal-image": "^0.1.2",
     "uuid": "^3.3.2",
     "wechaty": "^0.22.6",

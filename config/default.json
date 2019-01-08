@@ -1,0 +1,5 @@
+{
+  "vendor": {
+    "padpro_token": "should be provided in local.json"
+  }
+}

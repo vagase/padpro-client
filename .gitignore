@@ -81,3 +81,6 @@ typings/
 
 # WebStorm project files
 .idea
+
+# config local files
+config/local*
