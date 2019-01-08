@@ -6,6 +6,6 @@
     "terminal-image": "^0.1.2",
     "uuid": "^3.3.2",
     "wechaty": "^0.22.6",
-    "wechaty-puppet-padpro": "0.0.31"
+    "wechaty-puppet-padpro": "0.0.35"
   }
 }
