@@ -1,0 +1,95 @@
+// Copyright 2015 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "net.hawkwithwind.chatbothub";
+option java_outer_classname = "ChatBotHubProto";
+
+package chatbothub;
+
+service ChatBotHub {
+  // bots only use eventtunnel to communicate
+  rpc EventTunnel (stream EventRequest) returns (stream EventReply) {}
+
+  // below are for internal web api
+  rpc GetBots (BotsRequest) returns (BotsReply) {}
+  rpc BotLogin (BotLoginRequest) returns (BotLoginReply) {}
+  rpc BotAction (BotActionRequest) returns (BotActionReply) {}
+}
+
+message EventRequest {
+  string eventType = 1;
+  string body = 2;
+  string clientId = 3;
+  string clientType = 4;
+}
+
+message EventReply {
+  string eventType = 1;
+  string body = 2;
+  string clientId = 3;
+  string clientType = 4;
+}
+
+message BotsRequest {
+  repeated string logins = 1;
+  repeated string botIds = 2;
+}
+
+message BotsReply {
+  repeated BotsInfo botsInfo = 1;
+}
+
+message BotsInfo {
+  string clientId = 1;
+  string clientType = 2;
+  string name = 3;
+  int64 startAt = 4;
+  int64 lastPing = 5;
+  string login = 6;
+  string loginInfo = 7;
+  int32 status = 8;
+  string filterInfo = 9;
+  string botId = 10;
+}
+
+message BotLoginRequest {
+  string clientId = 1;
+  string clientType = 2;
+  string login = 3;
+  string password = 4;
+  string notifyUrl = 5;
+  string loginInfo = 6;
+  string botId = 7;
+}
+
+message BotLoginReply {
+  string msg = 1;
+}
+
+message BotActionRequest {
+  string actionRequestId = 1;
+  string login = 2;  
+  string actionType = 3;
+  string actionBody = 4;
+}
+
+message BotActionReply {
+  string actionRequestId = 1;
+  bool   success = 2;
+  string msg = 3;
+  string body = 4;
+}
