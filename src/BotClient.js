@@ -5,7 +5,7 @@ const config = require('config');
 const log = require('./log');
 const _ = require('lodash');
 
-class BotClientAdapter {
+module.exports.BotAdapter = class BotAdapter {
     constructor() {
         this.clientId = null;
         this.clientType = null;
@@ -17,32 +17,32 @@ class BotClientAdapter {
         this.botActionHandler[actionType] = handler;
     }
 
-    // whether
-    isOnline() {
-        // return !!this.wxbot
-    }
-
-    async setup() {
-
-    }
-
-    async login() {
-
-    }
-
-    async logout() {
-        // await this.wxbot.logout()
-    }
-
     async handleBotAction(actionType, actionBody) {
         const actionHandler = this.botActionHandler[actionType];
         if (!actionHandler) {
             throw `unsupported bot action: ${actionType}}`;
         }
 
-        return await actionHandler(actionType, actionBody);
+        return await actionHandler(actionBody);
     }
-}
+
+    // whether bot is signed in or not
+    isSignedIn() {
+        return false;
+    }
+
+    /**
+     * @param timeout: default 10 minutes
+     * @return {Promise<void>}
+     */
+    async login(loginInfo, timeout=10*60*1000) {
+
+    }
+
+    async logout() {
+        // await this.wxbot.logout()
+    }
+};
 
 /**
  * BotClient is the middle proxy between hub and client.
@@ -50,9 +50,9 @@ class BotClientAdapter {
  * - communicate with client with client's sdk
  * @type {module.BotClient}
  */
-module.exports = class BotClient {
-    constructor(adapter) {
-        this.adapter = adapter;
+module.exports.BotClient = class BotClient {
+    constructor(botAdapter) {
+        this.botAdapter = botAdapter;
 
         this.running = false;
         this.loginInfo = null;
@@ -61,161 +61,6 @@ module.exports = class BotClient {
 
         this.heartBeatTimer = null;
         this.heartBeatInterval = 10 * 1000;
-    }
-
-    _handleBotAction(actionType, actionBody) {
-        let ret = null;
-
-        if(actionType !== "SendImageMessage") {
-            log.info("actionBody %o", actionBody)
-        } else {
-            log.info("actionType %s", actionType)
-        }
-
-        if (actionType === "SendTextMessage") {
-            let toUserName = actionBody.toUserName;
-            let content = actionBody.content;
-            let atList = actionBody.atList;
-            if (toUserName === undefined || content === undefined || atList === undefined) {
-                log.error("send text message empty")
-                return
-            }
-
-            // ret = await bot.wxbot.sendMsg(toUserName, content, atList)
-        } else if (actionType === "SendAppMessage") {
-            let toUserName = actionBody.toUserName;
-            let object = actionBody.object;
-            if (toUserName === undefined || object === undefined) {
-                log.error("send app message empty")
-                return
-            }
-            // ret = await bot.wxbot.sendAppMsg(toUserName, object)
-        } else if (actionType === "SendImageResourceMessage") {
-            let toUserName = actionBody.toUserName;
-            let imageId = actionBody.imageId;
-            if (toUserName === undefined || imageId === undefined) {
-                log.error("send image message empty")
-                return
-            }
-
-            let rawFile = String(fs.readFileSync(`cache/${imageId}`))
-            // ret = await bot.wxbot.sendImage(toUserName, rawFile)
-            // log.info("send file %d returned %o", rawFile.length, ret)
-            // log.info(rawFile.substr(0, 80))
-        } else if (actionType === "AcceptUser") {
-            let stranger = actionBody.stranger;
-            let ticket = actionBody.ticket;
-            if (stranger === undefined || ticket === undefined ) {
-                log.error("accept user message empty")
-                return
-            }
-            // ret = await bot.wxbot.acceptUser(stranger, ticket)
-        } else if (actionType === "AddContact") {
-            let stranger = actionBody.stranger;
-            let ticket = actionBody.ticket;
-            let type = actionBody.type;
-            let content = actionBody.content;
-            if (stranger === undefined || ticket === undefined || type === undefined) {
-                log.error("add contact message empty")
-                return
-            }
-
-            // if (content === undefined) {
-            //     ret = await bot.wxbot.addContact(stranger, ticket, type)
-            // } else {
-            //     ret = await bot.wxbot.addContact(stranger, ticket, type, content)
-            // }
-        } else if (actionType === "SayHello") {
-            let stranger = actionBody.stranger;
-            let ticket = actionBody.ticket;
-            let content = actionBody.content;
-            if (stranger === undefined || ticket === undefined || content === undefined) {
-                log.error("say hello message empty")
-                return
-            }
-            // ret = await bot.wxbot.SayHello(stranger, ticket, content)
-        } else if (actionType == "GetContact") {
-            let userId = actionBody.userId;
-            if (userId === undefined) {
-                log.error("get contact message empty")
-                return
-            }
-            // ret = await bot.wxbot.getContact(userId)
-        } else if (actionType == "CreateRoom") {
-            let userList = actionBody.userList;
-            log.info("create room userlist %o", userList)
-            if (userList === undefined) {
-                log.error("create room message empty")
-                return
-            }
-            // ret = await bot.wxbot.createRoom(userList)
-        } else if (actionType == "GetRoomMembers") {
-            let groupId = actionBody.groupId;
-            if (groupId === undefined) {
-                log.error("get room members message empty")
-                return
-            }
-            // ret = await bot.wxbot.getRoomMembers(groupId)
-        } else if (actionType == "GetRoomQRCode") {
-            let groupId = actionBody.groupId;
-            if (groupId === undefined) {
-                log.error("get room QRCode message empty")
-                return
-            }
-            // ret = await bot.wxbot.getRoomQrcode(groupId)
-        } else if (actionType == "AddRoomMember") {
-            let groupId = actionBody.groupId;
-            let userId = actionBody.userId;
-            if (groupId === undefined || userId === undefined ) {
-                log.error("add room member message empty")
-                return
-            }
-            // ret = await bot.wxbot.addRoomMember(groupId, userId)
-        } else if (actionType == "InviteRoomMember") {
-            let groupId = actionBody.groupId;
-            let userId = actionBody.userId;
-            if (groupId === undefined || userId === undefined ) {
-                log.error("invite room member message empty")
-                return
-            }
-            // ret = await bot.wxbot.inviteRoomMember(groupId, userId)
-        } else if (actionType == "DeleteRoomMember") {
-            let groupId = actionBody.groupId;
-            let userId = actionBody.userId;
-            if (groupId === undefined || userId === undefined ) {
-                log.error("delete room member message empty")
-                return
-            }
-            // ret = await bot.wxbot.deleteRoomMember(groupId, userId)
-        } else if (actionType == "SetRoomAnnouncement") {
-            let groupId = actionBody.groupId;
-            let content = actionBody.content;
-            if (groupId === undefined || userId === undefined ) {
-                log.error("set room announcement message empty")
-                return
-            }
-            // ret = await bot.wxbot.setRoomAnnouncement(groupId, content)
-        } else if (actionType == "SetRoomName") {
-            let groupId = actionBody.groupId
-            let content = actionBody.content
-            if (groupId === undefined || userId === undefined ) {
-                log.error("set room name message empty")
-                return
-            }
-            // ret = await bot.wxbot.setRoomName(groupId, content)
-        } else if (actionType == "GetContantQRCode") {
-            let userId = actionBody.userId
-            let style = actionBody.style
-            if (userId === undefined || style === undefined) {
-                log.error("get contact qrcode message empty")
-                return
-            }
-            // ret = await bot.wxbot.getContactQrcode(userId, style)
-        } else {
-            log.error("unsupported action", actionType)
-        }
-
-        return ret;
     }
 
     async _handleLoginRequest(body) {
@@ -229,7 +74,7 @@ module.exports = class BotClient {
             this.loginInfo = JSON.parse(loginBody.loginInfo);
         }
 
-        const ret = await this.adapter.login(this.loginInfo);
+        const ret = await this.botAdapter.login(this.loginInfo);
         log.info('login DONE: ' + JSON.stringify(ret));
 
         return ret;
@@ -246,7 +91,7 @@ module.exports = class BotClient {
         } else {
             log.info("CMD ", eventType);
 
-            if (!this.adapter.isOnline()) {
+            if (!this.botAdapter.isSignedIn()) {
                 this._actionReplyWithError(eventType, body, 'bot instance is offline');
                 log.error(`[${eventType}] bot instance is offline: ${body}`);
                 return;
@@ -259,7 +104,7 @@ module.exports = class BotClient {
                 if (eventType === 'LOGIN') {
                     response = await this._handleLoginRequest(body);
                 } else if (eventType === 'LOGOUT') {
-                    response = await this.adapter.logout();
+                    response = await this.botAdapter.logout();
                 } else if (eventType === 'BOTACTION') {
                     const parsedBody = JSON.parse(body);
                     let actionType = parsedBody.actionType;
@@ -270,7 +115,7 @@ module.exports = class BotClient {
                         return
                     }
 
-                    response = await this.adapter.handleBotAction(actionType, actionBody);
+                    response = await this.botAdapter.handleBotAction(actionType, actionBody);
                 } else {
                     unhandled = true;
                     log.info(`unhandled message: ${eventType}`);
@@ -326,8 +171,8 @@ module.exports = class BotClient {
                 }
             }
 
-            req.setClientid(this.adapter.clientId);
-            req.setClienttype(this.adapter.clientType);
+            req.setClientid(this.botAdapter.clientId);
+            req.setClienttype(this.botAdapter.clientType);
 
             return req;
         };
@@ -351,7 +196,7 @@ module.exports = class BotClient {
         });
     }
 
-    _startHeartBeatTimer() {
+    _startHubHeartBeat() {
         if (this.heartBeatTimer) {
             return;
         }
@@ -361,7 +206,7 @@ module.exports = class BotClient {
         }, this.heartBeatInterval);
     }
 
-    _stopHeartBeatTimer() {
+    _stopHubHeartBeat() {
         if (!this.heartBeatTimer) {
             return;
         }
@@ -383,8 +228,8 @@ module.exports = class BotClient {
         const tunnel = client.eventTunnel();
         this.tunnel = tunnel;
 
-        // init adapter
-        await this.adapter.setup();
+        // init botAdapter
+        await this.botAdapter.setup();
 
         tunnel.on('data', async (eventReply) => {
             return this._handleTunnelEvent(eventReply);
@@ -403,7 +248,7 @@ module.exports = class BotClient {
         // Register client with hub instantly.
         await this._sendTunnelEvent("REGISTER", "HELLO");
 
-        this._startHeartBeatTimer();
+        this._startHubHeartBeat();
     }
 
     async stop() {
@@ -411,11 +256,11 @@ module.exports = class BotClient {
             return;
         }
 
-        this._stopHeartBeatTimer();
+        this._stopHubHeartBeat();
 
         this.tunnel.end();
         this.running = false;
 
-        // stop client will not logout client adapter
+        // stop client will not logout client botAdapter
     }
 };
