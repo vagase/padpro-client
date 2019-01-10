@@ -1,4 +1,5 @@
 const log4js = require('log4js');
+const path = require('path');
 
 try {
     require('fs').mkdirSync('./logs')
@@ -10,7 +11,7 @@ try {
 }
 
 try {
-    log4js.configure('../config/log4js.json');
+    log4js.configure(path.resolve(__dirname,'../config/log4js.json'));
 } catch (e) {
     console.error('载入log4js日志输出配置错误: ', e)
     process.exit(1);

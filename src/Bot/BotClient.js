@@ -1,48 +1,9 @@
-const messages = require('./proto/chatbothub/chatbothub_pb');
-const services = require('./proto/chatbothub/chatbothub_grpc_pb');
+const messages = require('../proto/chatbothub/chatbothub_pb');
+const services = require('../proto/chatbothub/chatbothub_grpc_pb');
 const grpc = require('grpc');
 const config = require('config');
-const log = require('./log');
+const log = require('../log');
 const _ = require('lodash');
-
-module.exports.BotAdapter = class BotAdapter {
-    constructor() {
-        this.clientId = null;
-        this.clientType = null;
-
-        this.botActionHandler = {};
-    }
-
-    registerBotAction(actionType, handler) {
-        this.botActionHandler[actionType] = handler;
-    }
-
-    async handleBotAction(actionType, actionBody) {
-        const actionHandler = this.botActionHandler[actionType];
-        if (!actionHandler) {
-            throw `unsupported bot action: ${actionType}}`;
-        }
-
-        return await actionHandler(actionBody);
-    }
-
-    // whether bot is signed in or not
-    isSignedIn() {
-        return false;
-    }
-
-    /**
-     * @param timeout: default 10 minutes
-     * @return {Promise<void>}
-     */
-    async login(loginInfo, timeout=10*60*1000) {
-
-    }
-
-    async logout() {
-        // await this.wxbot.logout()
-    }
-};
 
 /**
  * BotClient is the middle proxy between hub and client.
@@ -50,9 +11,10 @@ module.exports.BotAdapter = class BotAdapter {
  * - communicate with client with client's sdk
  * @type {module.BotClient}
  */
-module.exports.BotClient = class BotClient {
+module.exports = class BotClient {
     constructor(botAdapter) {
         this.botAdapter = botAdapter;
+        this._setupBotAdapter();
 
         this.running = false;
         this.loginInfo = null;
@@ -63,7 +25,25 @@ module.exports.BotClient = class BotClient {
         this.heartBeatInterval = 10 * 1000;
     }
 
+    _setupBotAdapter() {
+        this.botAdapter.registerCallback('onlogin', async (userSelf) => {
+            await this._actionReply("LOGINDONE", {
+                userName: userSelf.id,
+                wxData: this.loginInfo.wxData,
+                token: this.loginInfo.token,
+                botId: this.botId,
+            });
+        });
+    }
+
     async _handleLoginRequest(body) {
+        if (this.botAdapter.isSignedIn()) {
+            log.error("cannot login again while current bot is running.")
+
+            await this._actionReplyWithError('LOGINFAILED', "cannot login again while current bot is running.");
+            return;
+        }
+
         log.info('begin login');
 
         const loginBody = JSON.parse(body);
@@ -74,10 +54,7 @@ module.exports.BotClient = class BotClient {
             this.loginInfo = JSON.parse(loginBody.loginInfo);
         }
 
-        const ret = await this.botAdapter.login(this.loginInfo);
-        log.info('login DONE: ' + JSON.stringify(ret));
-
-        return ret;
+        await this.botAdapter.login(this.loginInfo);
     }
 
     async _handleTunnelEvent(event) {
@@ -88,24 +65,37 @@ module.exports.BotClient = class BotClient {
 
         if (eventType === 'PONG') {
             //log.info("PONG " + clientType + " " + clientid);
-        } else {
-            log.info("CMD ", eventType);
+            return;
+        }
 
+        log.info(`received tunnel event: ${eventType}`);
+
+        if (eventType === 'LOGIN') {
+            await this._handleLoginRequest(body);
+        }
+        else if (eventType === 'LOGOUT') {
             if (!this.botAdapter.isSignedIn()) {
-                this._actionReplyWithError(eventType, body, 'bot instance is offline');
-                log.error(`[${eventType}] bot instance is offline: ${body}`);
+                await this._actionReplyWithError(eventType, body, 'Can not logout, because the bot is not signed on');
+                log.error(`Can not logout, because the bot is not signed on`);
+                return;
+            }
+
+            await this.botAdapter.logout();
+        }
+        else {
+            if (!this.botAdapter.isSignedIn()) {
+                await this._actionReplyWithError(eventType, body, 'Bot is not signed on, can not execute any action.');
+                log.error(`[${eventType}] Bot is not signed on, can not execute any action: ${body}`);
                 return;
             }
 
             try {
                 let response = null;
-                let unhandled = false;
+                let handled = false;
 
-                if (eventType === 'LOGIN') {
-                    response = await this._handleLoginRequest(body);
-                } else if (eventType === 'LOGOUT') {
-                    response = await this.botAdapter.logout();
-                } else if (eventType === 'BOTACTION') {
+                if (eventType === 'BOTACTION') {
+                    handled = true;
+
                     const parsedBody = JSON.parse(body);
                     let actionType = parsedBody.actionType;
                     const actionBody = parsedBody.body;
@@ -116,16 +106,15 @@ module.exports.BotClient = class BotClient {
                     }
 
                     response = await this.botAdapter.handleBotAction(actionType, actionBody);
-                } else {
-                    unhandled = true;
-                    log.info(`unhandled message: ${eventType}`);
                 }
 
-                if (unhandled) {
-                    await this._actionReplyWithError(eventType, body, 'unhandled message');
+                if (handled) {
+                    await this._actionReply(eventType, body, response);
                 }
                 else {
-                    await this._actionReply(eventType, body, response);
+                    await this._actionReplyWithError(eventType, body, 'unhandled message');
+
+                    log.info(`[${eventType}] unhandled message`);
                 }
             }
             catch (e) {
@@ -156,6 +145,7 @@ module.exports.BotClient = class BotClient {
                 bodyStr = bodyStr.substr(0, 120);
             }
         }
+
         log.info(`tunnel send: [${eventType}] ${bodyStr}`);
 
         const newEventRequest = (eventType, body) => {
@@ -202,7 +192,7 @@ module.exports.BotClient = class BotClient {
         }
 
         this.heartBeatTimer = setInterval(async () => {
-            this._sendTunnelEvent("PING");
+            this._sendTunnelEvent("PING", "");
         }, this.heartBeatInterval);
     }
 
@@ -219,28 +209,24 @@ module.exports.BotClient = class BotClient {
         if (this.running) {
             return;
         }
+        this.running = true;
 
         log.info("begin grpc connection");
-        this.running = true;
 
         // init new grpc connection
         const client = new services.ChatBotHubClient(`${config.get("chatBotHub.host")}:${config.get('chatBotHub.port')}`, grpc.credentials.createInsecure());
-        const tunnel = client.eventTunnel();
-        this.tunnel = tunnel;
+        this.tunnel = client.eventTunnel();
 
-        // init botAdapter
-        await this.botAdapter.setup();
-
-        tunnel.on('data', async (eventReply) => {
+        this.tunnel.on('data', async (eventReply) => {
             return this._handleTunnelEvent(eventReply);
         });
 
-        tunnel.on('error', async (e) => {
+        this.tunnel.on('error', async (e) => {
             log.error("grpc connection error", "code", e.code, e.details);
             await this.stop();
         });
 
-        tunnel.on('end', async () => {
+        this.tunnel.on('end', async () => {
             log.info("grpc connection closed");
             await this.stop();
         });
@@ -259,6 +245,7 @@ module.exports.BotClient = class BotClient {
         this._stopHubHeartBeat();
 
         this.tunnel.end();
+        this.tunnel = null;
         this.running = false;
 
         // stop client will not logout client botAdapter

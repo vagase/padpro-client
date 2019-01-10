@@ -1,8 +1,10 @@
 const printImage = require("./utils").printImage;
 const { Wechaty } = require('wechaty');
 const config = require('config');
-const WECHATY_PUPPET_PADPRO_TOKEN = config.get('vendor.padproToken');
+const PadProWechatBotAdapter = require("./Bot/PadProWechatBotAdapter");
+const BotClient = require("./Bot/BotClient");
 
+const WECHATY_PUPPET_PADPRO_TOKEN = config.get('vendor.padproToken');
 const puppet = 'wechaty-puppet-padpro';
 const puppetOptions = {
     token: WECHATY_PUPPET_PADPRO_TOKEN,
@@ -22,3 +24,7 @@ bot.on('scan', async (qrcode, status) => {
     .on('login',            user => console.log(`User ${user} logined`))
     .on('message',       message => console.log(`Message: ${message}`))
     .start();
+
+// const pardProToken = config.get('vendor.padproToken');
+// const padProAdapter = new PadProWechatBotAdapter(pardProToken);
+// const bot = new BotClient(padProAdapter);

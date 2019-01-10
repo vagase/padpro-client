@@ -1,43 +1,21 @@
-import {Friendship} from "wechaty";
-
-const {BotAdapter} = require('../BotClient');
+const BotAdapter = require('./BotAdapter');
 const log = require('../log');
 const fs = require('fs');
-const printImage = require("./utils").printImage;
+const printImage = require("../utils").printImage;
 const { Wechaty } = require('wechaty');
-const config = require('config');
 const {FileBox} = require('file-box');
 
-class PadProWechatBotAdapter extends BotAdapter {
+module.exports = class PadProWechatBotAdapter extends BotAdapter {
     constructor(token) {
         super();
 
         this.wechatyInstance = null;
         this.token = token;
 
-
-        this.loginTimeout = null;
-        this.loginPromiseResolve = null;
-        this.loginPromiseReject = null;
         this.contactSelf = null;
 
         this._setupWechaty();
         this._registerBotActions();
-    }
-
-    _onLogin(error) {
-        if (error) {
-            this.loginPromiseReject(error);
-        }
-        else {
-            this.loginPromiseResolve();
-        }
-
-        clearTimeout(this.loginTimeout);
-
-        this.loginTimeout = null;
-        this.loginPromiseResolve = null;
-        this.loginPromiseReject = null;
     }
 
     _setupWechaty() {
@@ -62,7 +40,8 @@ class PadProWechatBotAdapter extends BotAdapter {
             // emit after bot login full successful
             .on('login', (userSelf) => {
                 this.contactSelf = userSelf;
-                this._onLogin(userSelf);
+
+                this.invokeCallback('onlogin', [userSelf]);
             })
 
             // emit after the bot log out
@@ -361,23 +340,11 @@ class PadProWechatBotAdapter extends BotAdapter {
         return this.wechatyInstance.logonoff();
     }
 
-    async login(loginInfo, timeout=10*60*1000) {
-        return new Promise(async (resolve, reject) => {
-            this.loginPromiseResolve = resolve;
-            this.loginPromiseReject = reject;
-
-            this.loginTimeout = setTimeout(() => {
-                this._onLogin('login timeout');
-            }, timeout);
-
-            await this.wechatyInstance.start();
-        });
+    async login(loginInfo) {
+        return this.wechatyInstance.start();
     }
 
     async logout() {
         return this.wechatyInstance.logout();
     }
 }
-
-
-module.exports.PadProWechatBotAdapter = PadProWechatBotAdapter;
