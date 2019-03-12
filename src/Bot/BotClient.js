@@ -4,6 +4,7 @@ const grpc = require('grpc');
 const config = require('config');
 const log = require('../log');
 const _ = require('lodash');
+const {BotAdapterCallback} = require('./BotAdapter');
 
 /**
  * BotClient is the middle proxy between hub and client.
@@ -26,13 +27,24 @@ module.exports = class BotClient {
     }
 
     _setupBotAdapter() {
-        this.botAdapter.registerCallback('onlogin', async (userSelf) => {
-            await this._actionReply("LOGINDONE", {
+        const adapter = this.botAdapter;
+
+        adapter.registerBotCallback(BotAdapterCallback.ON_LOGIN, async (userSelf) => {
+            await this._sendEventToHub('LOGINDONE', {
                 userName: userSelf.id,
-                wxData: this.loginInfo.wxData,
-                token: this.loginInfo.token,
+                // TODO: 处理自动登录的情形
+                // wxData: this.loginInfo.wxData,
+                // token: this.loginInfo.token,
                 botId: this.botId,
-            });
+            })
+        });
+
+        adapter.registerBotCallback(BotAdapterCallback.ON_LOGOUT, async (message) => {
+            await this._sendEventToHub('LOGOUTDONE', message);
+        });
+
+        adapter.registerBotCallback(BotAdapterCallback.ON_QRCODE, async (payload) => {
+            await this._sendEventToHub('LOGINSCAN', payload);
         });
     }
 
@@ -40,7 +52,7 @@ module.exports = class BotClient {
         if (this.botAdapter.isSignedIn()) {
             log.error("cannot login again while current bot is running.")
 
-            await this._actionReplyWithError('LOGINFAILED', "cannot login again while current bot is running.");
+            await this._replyActionToHubWithError('LOGINFAILED', "cannot login again while current bot is running.");
             return;
         }
 
@@ -51,20 +63,26 @@ module.exports = class BotClient {
         this.botId = loginBody.botId;
 
         if (loginBody.loginInfo.length > 0) {
-            this.loginInfo = JSON.parse(loginBody.loginInfo);
+            try {
+                this.loginInfo = JSON.parse(loginBody.loginInfo);
+            }
+            catch (e) {
+                console.error('login info is not json format: ');
+                console.error(e);
+            }
         }
 
         await this.botAdapter.login(this.loginInfo);
     }
 
-    async _handleTunnelEvent(event) {
+    async _handleEventFromHub(event) {
         const eventType = event.getEventtype();
         const body = event.getBody();
-        const clientid = event.getClientid();
+        const clientId = event.getClientid();
         const clientType = event.getClienttype();
 
         if (eventType === 'PONG') {
-            //log.info("PONG " + clientType + " " + clientid);
+            log.info("PONG " + clientType + " " + clientId);
             return;
         }
 
@@ -75,7 +93,7 @@ module.exports = class BotClient {
         }
         else if (eventType === 'LOGOUT') {
             if (!this.botAdapter.isSignedIn()) {
-                await this._actionReplyWithError(eventType, body, 'Can not logout, because the bot is not signed on');
+                await this._replyActionToHubWithError(eventType, body, 'Can not logout, because the bot is not signed on');
                 log.error(`Can not logout, because the bot is not signed on`);
                 return;
             }
@@ -84,10 +102,12 @@ module.exports = class BotClient {
         }
         else {
             if (!this.botAdapter.isSignedIn()) {
-                await this._actionReplyWithError(eventType, body, 'Bot is not signed on, can not execute any action.');
+                await this._replyActionToHubWithError(eventType, body, 'Bot is not signed on, can not execute any action.');
                 log.error(`[${eventType}] Bot is not signed on, can not execute any action: ${body}`);
                 return;
             }
+
+            log.debug(`> handle event from hub: ${eventType} ${body}`);
 
             try {
                 let response = null;
@@ -105,25 +125,25 @@ module.exports = class BotClient {
                         return
                     }
 
-                    response = await this.botAdapter.handleBotAction(actionType, actionBody);
+                    response = await this.botAdapter.handleBotActionFromHub(actionType, actionBody);
                 }
 
                 if (handled) {
-                    await this._actionReply(eventType, body, response);
+                    await this._replyActionToHub(eventType, body, response);
                 }
                 else {
-                    await this._actionReplyWithError(eventType, body, 'unhandled message');
+                    await this._replyActionToHubWithError(eventType, body, 'unhandled message');
 
                     log.info(`[${eventType}] unhandled message`);
                 }
             }
             catch (e) {
-                await this._actionReplyWithError(eventType, body, e.toString());
+                await this._replyActionToHubWithError(eventType, body, e.toString());
             }
         }
     }
 
-    _sendTunnelEvent(eventType, eventBody) {
+    _sendEventToHub(eventType, eventBody) {
         if (this.tunnel === undefined) {
             log.error('grpc connection not established while receiving wxlogin callback, exit.')
             return
@@ -170,8 +190,8 @@ module.exports = class BotClient {
         this.tunnel.write(newEventRequest(eventType, eventBody))
     }
 
-    _actionReply(eventType, body, result) {
-        return this._sendTunnelEvent(
+    _replyActionToHub(eventType, body, result) {
+        return this._sendEventToHub(
             'ACTIONREPLY',
             {
                 eventType: eventType,
@@ -180,8 +200,8 @@ module.exports = class BotClient {
             });
     }
 
-    _actionReplyWithError(eventType, body, error) {
-        return this._actionReply(eventType, body, {
+    _replyActionToHubWithError(eventType, body, error) {
+        return this._replyActionToHub(eventType, body, {
             error
         });
     }
@@ -192,7 +212,7 @@ module.exports = class BotClient {
         }
 
         this.heartBeatTimer = setInterval(async () => {
-            this._sendTunnelEvent("PING", "");
+            this._sendEventToHub("PING", "");
         }, this.heartBeatInterval);
     }
 
@@ -218,7 +238,7 @@ module.exports = class BotClient {
         this.tunnel = client.eventTunnel();
 
         this.tunnel.on('data', async (eventReply) => {
-            return this._handleTunnelEvent(eventReply);
+            return this._handleEventFromHub(eventReply);
         });
 
         this.tunnel.on('error', async (e) => {
@@ -232,7 +252,7 @@ module.exports = class BotClient {
         });
 
         // Register client with hub instantly.
-        await this._sendTunnelEvent("REGISTER", "HELLO");
+        await this._sendEventToHub("REGISTER", "HELLO");
 
         this._startHubHeartBeat();
     }

@@ -1,16 +1,19 @@
 {
   "dependencies": {
     "config": "^3.0.1",
+    "deferred-leveldown": "^5.0.0",
     "file-box": "^0.8.27",
     "google-protobuf": "^3.6.1",
     "got": "^9.5.0",
-    "grpc": "^1.17.0",
+    "grpc": "^1.19.0",
     "lodash": "^4.17.11",
     "log4js": "^3.0.6",
     "request-promise": "^4.2.2",
     "terminal-image": "^0.1.2",
     "uuid": "^3.3.2",
     "wechaty": "^0.22.6",
-    "wechaty-puppet-padpro": "0.0.35"
+    "wechaty-puppet": "^0.14.1",
+    "wechaty-puppet-padchat": "^0.18.2",
+    "wechaty-puppet-padpro": "0.0.52"
   }
 }

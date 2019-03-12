@@ -1,18 +1,18 @@
-module.exports = class BotAdapter {
-    constructor() {
-        this.clientId = null;
-        this.clientType = null;
+module.exports.BotAdapter = class BotAdapter {
+    constructor(clientId, clientType) {
+        this.clientId = clientId;
+        this.clientType = clientType;
 
         this.botActionHandler = {};
 
-        this.callbacks = {};
+        this.botCallbacks = {};
     }
 
     registerBotAction(actionType, handler) {
         this.botActionHandler[actionType] = handler;
     }
 
-    async handleBotAction(actionType, actionBody) {
+    async handleBotActionFromHub(actionType, actionBody) {
         const actionHandler = this.botActionHandler[actionType];
         if (!actionHandler) {
             throw `unsupported bot action: ${actionType}}`;
@@ -21,17 +21,13 @@ module.exports = class BotAdapter {
         return await actionHandler(actionBody);
     }
 
-    registerCallback(name, func) {
-        this.callbacks = func;
+    registerBotCallback(name, func) {
+        this.botCallbacks[name] = func;
     }
 
-    invokeCallback(name, args) {
-        const func = this.callbacks[name];
-        if (!func) {
-            return;
-        }
-
-        func.apply(null, args);
+    async invokeBotCallback(name, payload) {
+        const func = this.botCallbacks[name];
+        func && func(payload);
     }
 
     // whether bot is signed in or not
@@ -44,10 +40,14 @@ module.exports = class BotAdapter {
      * @return {Promise<void>}
      */
     async login(loginInfo) {
-
     }
 
     async logout() {
-        // await this.wxbot.logout()
     }
+}
+
+module.exports.BotAdapterCallback = {
+    ON_LOGIN: 'onLogin',
+    ON_LOGOUT: 'onLogout',
+    ON_QRCODE: 'onQRRCode'
 };
