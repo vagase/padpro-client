@@ -5,6 +5,8 @@ const { Wechaty } = require('wechaty');
 const { PuppetPadpro} = require('wechaty-puppet-padpro');
 const {FileBox} = require('file-box');
 const config = require('config');
+const qrcode = require('qrcode');
+const moment = require('moment');
 
 module.exports = class PadProWechatBotAdapter extends BotAdapter {
     constructor(token) {
@@ -21,29 +23,35 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
     }
 
     _newWechatyBot() {
-        const puppet = new PuppetPadpro({
-            token: this.token,
-        });
+        // const puppet = new PuppetPadpro({
+        //     token: this.token,
+        // });
+        //
+        // const result = new Wechaty({
+        //     puppet
+        // });
 
         const result = new Wechaty({
-            puppet
+            puppet: 'wechaty-puppet-padchat',
+            puppetOptions: {
+                token: 'puppet_padchat_a8f8e6a2b9463ee8',
+            },
         });
 
-        // const result = new Wechaty({
-        //     puppet: 'wechaty-puppet-padchat',
-        //     puppetOptions: {
-        //         token: 'puppet_padchat_a8f8e6a2b9463ee8',
-        //     },
-        // });
+        /**
+         * 1. 关于 on.login、on.logout、on.error
+         *  机器人登录了(on.login)，因为一些问题（比如网络）可能调用 on.logout 或 on.error。
+         *  之后机器人会继续尝试登录，当登录成功后会继续调用 on.login
+         */
 
         result
         // emit when the bot needs to show you a QR Code for scanning
-            .on('scan', async (qrcode, status) => {
-                const QRImageURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrcode)}`;
-
+            .on('scan', async (url, status) => {
+                const QRImageURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}`;
                 console.debug(`on scan: ${QRImageURL} ${status}`);
 
-                this.invokeBotCallback(BotAdapterCallback.ON_QRCODE, {url: QRImageURL, status: status});
+                const qrURLData = await qrcode.toDataURL(url);
+                this.invokeBotCallback(BotAdapterCallback.ON_QRCODE, {url: qrURLData, status: status});
             })
 
             // emit after bot login full successful
@@ -56,28 +64,27 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
                 this.contactSelf = userSelf;
 
                 this.invokeBotCallback(BotAdapterCallback.ON_LOGIN, userSelf);
+
+                await this._sendTextToFileHelper('已登录');
             })
 
             // emit after the bot log out
-            .on('logout', (userSelf) => {
+            .on('logout', async (userSelf) => {
                 console.debug(`on logout: ${userSelf}`);
 
-                this._logout();
                 this.invokeBotCallback(BotAdapterCallback.ON_LOGOUT, '用户已主动登出');
             })
 
             // When the bot get error, there will be a Wechaty error event fired.
             // TODO: 如果异常下线，尝试重连、自动登录等操作
-            .on('error', (error) => {
+            .on('error', async (error) => {
                 console.debug(`on error: ${error}`);
 
-                this._logout();
                 this.invokeBotCallback(BotAdapterCallback.ON_LOGOUT, `用户被下线：${error}`);
             })
 
             // Get bot’s heartbeat.
             .on('heartbeat', (data) => {
-                console.debug(`on heartbeat: ${data}`);
             })
 
             // emit when someone sends bot a friend request
@@ -91,8 +98,11 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
             })
 
             // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
-            .on('ready', () => {
+            .on('ready', async () => {
                 console.debug(`on ready`);
+
+                // 当联系人和聊天都同步好后，给文件助手发一条消息
+                await this._sendTextToFileHelper('已完成同步');
             })
 
             // emit when anyone join any room
@@ -118,9 +128,46 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
         return result;
     }
 
-    async _findTarget(id, actionName) {
+    async _sendTextToFileHelper(text) {
+        const contact = await this._findContact('文件传输助手');
+        const time = moment().format('YYYY-MM-DD HH:mm:ss');
+        return contact.say(`${time}\n${text}`);
+    }
+
+    async _findContact(name, alias) {
+        const query = {};
+        if (name) {
+            query['name'] = name;
+        }
+        if (alias) {
+            query['alias'] = alias;
+        }
+
+        const contact = await this.wechatyBot.Contact.find(query);
+        if (!contact) {
+            throw `contact is not found: ${JSON.stringify(query)}`;
+        }
+
+        return contact;
+    }
+
+    async _findRoom(topic) {
+        const query = {};
+        if (topic) {
+            query['topic'] = topic;
+        }
+
+        const room = await this.wechatyBot.Room.find({topic: topic});
+        if (!room) {
+            throw  `room is not found: ${JSON.stringify(query)}`;
+        }
+
+        return room;
+    }
+
+    async _findTarget(id,  actionName) {
         // to room
-        if (id.indexOf('@chatroom')) {
+        if (id.indexOf('@chatroom') !== -1) {
             const roomId = id.split('@')[0];
             // TODO:
             const room = await this.wechatyBot.Room.find({topic: roomId});
@@ -135,7 +182,7 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
         // to contact
         else {
             // TODO
-            const contact = await this.wechatyBot.Contact.find({alias: id});
+            const contact = await this.wechatyBot.Contact.find({name: id});
             if (!contact) {
                 let error = actionName ? `${actionName} failed, ` : '';
                 error += `contact is not found: ${id}`;
@@ -363,17 +410,6 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
         });
     }
 
-    _logout() {
-        if (!this.wechatyBot) {
-            return null;
-        }
-
-        const result = this.wechatyBot;
-        this.wechatyBot = null;
-
-        return result;
-    }
-
     isSignedIn() {
         return this.wechatyBot && this.wechatyBot.logonoff();
     }
@@ -389,7 +425,11 @@ module.exports = class PadProWechatBotAdapter extends BotAdapter {
     }
 
     async logout() {
-        const wechatyBot = this._logout(true);
-        wechatyBot && await wechatyBot.logout();
+        if (!this.wechatyBot) {
+            return null;
+        }
+
+        await this.wechatyBot.logout();
+        this.wechatyBot = null;
     }
 };
