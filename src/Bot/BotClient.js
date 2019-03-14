@@ -4,7 +4,7 @@ const grpc = require('grpc');
 const config = require('config');
 const log = require('../log');
 const _ = require('lodash');
-const {BotAdapterCallback} = require('./BotAdapter');
+const BotAdapter = require('./BotAdapter');
 
 /**
  * BotClient is the middle proxy between hub and client.
@@ -29,22 +29,12 @@ module.exports = class BotClient {
     _setupBotAdapter() {
         const adapter = this.botAdapter;
 
-        adapter.registerBotCallback(BotAdapterCallback.ON_LOGIN, async (userSelf) => {
-            await this._sendEventToHub('LOGINDONE', {
-                userName: userSelf.id,
-                // TODO: 处理自动登录的情形
-                // wxData: this.loginInfo.wxData,
-                // token: this.loginInfo.token,
-                botId: this.botId,
-            })
-        });
+        adapter.registerBotCallback(BotAdapter.Callback.SEND_HUB_EVENT, async ({eventType, eventBody }) => {
+            if (eventType === 'LOGINDONE') {
+                eventBody['botId'] = this.botId;
+            }
 
-        adapter.registerBotCallback(BotAdapterCallback.ON_LOGOUT, async (message) => {
-            await this._sendEventToHub('LOGOUTDONE', message);
-        });
-
-        adapter.registerBotCallback(BotAdapterCallback.ON_QRCODE, async (payload) => {
-            await this._sendEventToHub('LOGINSCAN', payload);
+            return this._sendEventToHub(eventType, eventBody);
         });
     }
 
@@ -125,7 +115,7 @@ module.exports = class BotClient {
                         return
                     }
 
-                    response = await this.botAdapter.handleBotActionFromHub(actionType, actionBody);
+                    response = await this.botAdapter.handleHubAction(actionType, actionBody);
                 }
 
                 if (handled) {
