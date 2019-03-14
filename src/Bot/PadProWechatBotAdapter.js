@@ -674,8 +674,12 @@ class PadProWechatBotAdapter extends BotAdapter {
     }
 
     async login(loginInfo) {
+        // 重复登录，直接返回
         if (this.wechatyBot) {
-            log.error(`Can not login twice ${this.clientType} ${this.clientId}`);
+            this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
+                userName: this.contactSelf.id
+            });
+
             return;
         }
 

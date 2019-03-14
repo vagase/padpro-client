@@ -59,14 +59,8 @@ class BotClient extends EventEmitter {
         // stop client will not logout client botAdapter
     }
 
+    // 允许重复登录，重复登录直接返回 login done
     async _handleLoginRequest(body) {
-        if (this.botAdapter.isSignedIn()) {
-            log.error("cannot login again while current bot is running.")
-
-            await this._replyActionToHubWithError('LOGINFAILED', "cannot login again while current bot is running.");
-            return;
-        }
-
         log.info('begin login');
 
         const loginBody = JSON.parse(body);
