@@ -5,6 +5,7 @@ const config = require('config');
 const log = require('../log');
 const _ = require('lodash');
 const BotAdapter = require('./BotAdapter');
+const EventEmitter = require('events');
 
 /**
  * BotClient is the middle proxy between hub and client.
@@ -12,8 +13,10 @@ const BotAdapter = require('./BotAdapter');
  * - communicate with client with client's sdk
  * @type {module.BotClient}
  */
-module.exports = class BotClient {
+class BotClient extends EventEmitter {
     constructor(botAdapter) {
+        super();
+
         this.botAdapter = botAdapter;
         this._setupBotAdapter();
 
@@ -36,6 +39,24 @@ module.exports = class BotClient {
 
             return this._sendEventToHub(eventType, eventBody);
         });
+    }
+
+    _stop(notify = false) {
+        if (!this.running) {
+            return;
+        }
+
+        this._stopHubHeartBeat();
+
+        this.tunnel.end();
+        this.tunnel = null;
+        this.running = false;
+
+        if (notify) {
+            this.emit('stop')
+        }
+
+        // stop client will not logout client botAdapter
     }
 
     async _handleLoginRequest(body) {
@@ -233,12 +254,12 @@ module.exports = class BotClient {
 
         this.tunnel.on('error', async (e) => {
             log.error("grpc connection error", "code", e.code, e.details);
-            await this.stop();
+            await this._stop(true);
         });
 
         this.tunnel.on('end', async () => {
             log.info("grpc connection closed");
-            await this.stop();
+            await this._stop(true);
         });
 
         // Register client with hub instantly.
@@ -248,16 +269,8 @@ module.exports = class BotClient {
     }
 
     async stop() {
-        if (!this.running) {
-            return;
-        }
-
-        this._stopHubHeartBeat();
-
-        this.tunnel.end();
-        this.tunnel = null;
-        this.running = false;
-
-        // stop client will not logout client botAdapter
+        this._stop();
     }
-};
+}
+
+module.exports = BotClient;
