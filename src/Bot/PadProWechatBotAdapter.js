@@ -79,7 +79,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                  * @type {*}
                  */
                 const payload = await preparePayload(message, true);
-                this.sendHubEvent(BotAdapter.HubEvent.IMAGEMESSAGE, payload);
+                this.sendHubEvent(BotAdapter.HubEvent.EMOJIMESSAGE, payload);
             },
 
             [MessageType.Image]: async (message) => {
@@ -168,6 +168,141 @@ class PadProWechatBotAdapter extends BotAdapter {
                  * @type {*}
                  */
 
+                const payload = await preparePayload(message, true);
+                this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
+            },
+
+            [MessageType.MiniProgram]: async (message) => {
+                /**
+                 文本消息
+                 text
+
+                 图片消息
+                 <?xml version="1.0"?>
+                 <msg>
+                 <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11"
+                 cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
+                 cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0"
+                 cdnhdwidth="0"
+                 cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
+                 length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
+                 </msg>
+
+                 H5链接卡片
+                 <?xml version="1.0"?>
+                 <msg>
+                 <appmsg appid="wx7217cc66fbed6d1d" sdkver="0">
+                 <title>【5.2折抢】Missha谜尚 谜尚红BB霜 SPF42+ PA+++ 50ml</title>
+                 <des>波罗蜜只卖￥87.1元，足足5.2折！还不快来抢！</des>
+                 <action />
+                 <type>5</type>
+                 <showtype>0</showtype>
+                 <soundtype>0</soundtype>
+                 <mediatagname />
+                 <messageext />
+                 <messageaction />
+                 <content />
+                 <contentattr>0</contentattr>
+                 <url>
+                 https://fx.bolo.me/module/landing/daiyanren.html?rev=https%3A%2F%2Ffx.bolo.me%2F%3Futm_term%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26utm_content%3Dsku_144240843157473_144240843180022%26utm_source%3Dwechat_friend%26utm_campaign%3Dapp_share%26utm_medium%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26source_type%3Dwechat_friend%26source_id%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%23%2Fproduct%2F144240843157473%3Fsku%3D144240843180022%26account%3Ddy_142571827670646&amp;user_id=142571827670646
+                 </url>
+                 <lowurl />
+                 <dataurl />
+                 <lowdataurl />
+                 <appattach>
+                 <totallen>0</totallen>
+                 <attachid />
+                 <emoticonmd5 />
+                 <fileext />
+                 <cdnthumburl>
+                 30570201000450304e02010002030192dd02032f565e020469ebce8c02045c89fe6c042a777875706c6f61645f777869645f346e6a706861616667636e6231323135315f313535323534373433360204010400030201000400
+                 </cdnthumburl>
+                 <cdnthumbmd5>74321bd4ca6b4fc7a3adf8f84bef9a79</cdnthumbmd5>
+                 <cdnthumblength>5064</cdnthumblength>
+                 <cdnthumbwidth>201</cdnthumbwidth>
+                 <cdnthumbheight>201</cdnthumbheight>
+                 <cdnthumbaeskey>f3c135a45d93d1298a45abbd64d385ca</cdnthumbaeskey>
+                 <aeskey>f3c135a45d93d1298a45abbd64d385ca</aeskey>
+                 <encryver>0</encryver>
+                 <filekey>wxid_4njphaafgcnb12151_1552547436</filekey>
+                 </appattach>
+                 <extinfo />
+                 <sourceusername />
+                 <sourcedisplayname />
+                 <thumburl />
+                 <md5 />
+                 <statextstr>GhQKEnd4NzIxN2NjNjZmYmVkNmQxZA==</statextstr>
+                 </appmsg>
+                 <fromusername>vagase</fromusername>
+                 <scene>0</scene>
+                 <appinfo>
+                 <version>2</version>
+                 <appname>波罗蜜日韩购</appname>
+                 </appinfo>
+                 <commenturl></commenturl>
+                 </msg>
+
+                 小程序卡片
+
+                 <?xml version="1.0"?>
+                 <msg>
+                 <appmsg appid="" sdkver="0">
+                 <title>快来1.00元起拼【Armani 法国 阿玛尼 小胖丁唇釉 #506 3.9ml】</title>
+                 <des />
+                 <action />
+                 <type>33</type>
+                 <showtype>0</showtype>
+                 <soundtype>0</soundtype>
+                 <mediatagname />
+                 <messageext />
+                 <messageaction />
+                 <content />
+                 <contentattr>0</contentattr>
+                 <url>https://mp.weixin.qq.com/mp/waerrpage?appid=wx979574d8814e4a12&amp;type=upgrade&amp;upgradetype=3#wechat_redirect</url>
+                 <lowurl />
+                 <dataurl />
+                 <lowdataurl />
+                 <appattach>
+                 <totallen>0</totallen>
+                 <attachid />
+                 <emoticonmd5 />
+                 <fileext />
+                 <cdnthumburl>30570201000450304e02010002030192dd02033d11fd0204a93e5b6502045c9b4557042a777875706c6f61645f777869645f346e6a706861616667636e6231323138375f313535333637393730330204010400030201000400</cdnthumburl>
+                 <cdnthumbmd5>b85dfb7b1ed5ee7257c96902358bc708</cdnthumbmd5>
+                 <cdnthumblength>22867</cdnthumblength>
+                 <cdnthumbwidth>750</cdnthumbwidth>
+                 <cdnthumbheight>567</cdnthumbheight>
+                 <cdnthumbaeskey>d3317bee189c367ade3d7256f307d2d8</cdnthumbaeskey>
+                 <aeskey>d3317bee189c367ade3d7256f307d2d8</aeskey>
+                 <encryver>0</encryver>
+                 <filekey>wxid_4njphaafgcnb12187_1553679703</filekey>
+                 </appattach>
+                 <extinfo />
+                 <sourceusername>gh_25db1e00370d@app</sourceusername>
+                 <sourcedisplayname>正常种草馆</sourcedisplayname>
+                 <thumburl />
+                 <md5 />
+                 <statextstr />
+                 <weappinfo>
+                 <username><![CDATA[gh_25db1e00370d@app]]></username>
+                 <appid><![CDATA[wx979574d8814e4a12]]></appid>
+                 <type>2</type>
+                 <version>41</version>
+                 <weappiconurl><![CDATA[http://mmbiz.qpic.cn/mmbiz_png/5FG1kxO4sI5maibHJlCChJM2ZbibCJ1jhXQ77GNeHP5Iu8vX2v71NicNSxIL8VzbROdyUzErHkt9Tev6icJK6sE31g/640?wx_fmt=png&wxfrom=200]]></weappiconurl>
+                 <pagepath><![CDATA[pages/share/index.html?url=bolome%3A%2F%2Fentity%2FGroupPurchaseGroupPageEntity%3Fgroup_id%3D29b1fa37aa895359172428c0f450140f&utm_medium=userid_152752156401456]]></pagepath>
+                 <shareId><![CDATA[0_wx979574d8814e4a12_103133_1553679700_0]]></shareId>
+                 <appservicetype>0</appservicetype>
+                 </weappinfo>
+                 </appmsg>
+                 <fromusername>vagase</fromusername>
+                 <scene>0</scene>
+                 <appinfo>
+                 <version>1</version>
+                 <appname></appname>
+                 </appinfo>
+                 <commenturl></commenturl>
+                 </msg>
+                 */
                 const payload = await preparePayload(message, true);
                 this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
             },
