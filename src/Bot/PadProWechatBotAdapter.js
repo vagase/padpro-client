@@ -8,6 +8,7 @@ const config = require('config');
 const qrcode = require('qrcode');
 const moment = require('moment');
 const {parseXml} = require('./utils');
+const uuidv4  = require('uuid/v4');
 
 class PadProWechatBotAdapter extends BotAdapter {
     constructor(token) {
@@ -78,10 +79,26 @@ class PadProWechatBotAdapter extends BotAdapter {
                  * @type {*}
                  */
                 const payload = await preparePayload(message, true);
-                this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
+                this.sendHubEvent(BotAdapter.HubEvent.IMAGEMESSAGE, payload);
             },
 
-            [MessageType.Image]: (message) => {
+            [MessageType.Image]: async (message) => {
+                /**
+                 <?xml version="1.0"?>
+                 <msg>
+                 <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11" cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0" cdnhdwidth="0" cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
+                 </msg>
+                 */
+
+                const payload = await preparePayload(message, true);
+
+                const imageId = this.contactSelf.id + "-" + uuidv4();
+                payload.imageId = imageId;
+
+                const fileBox = await message.toFileBox();
+                await fileBox.toFile(`cache/${imageId}`);
+
+                this.sendHubEvent(BotAdapter.HubEvent.IMAGEMESSAGE, payload);
             },
 
             [MessageType.Text]: async (message) => {
