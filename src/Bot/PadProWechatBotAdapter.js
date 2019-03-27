@@ -357,9 +357,6 @@ class PadProWechatBotAdapter extends BotAdapter {
             .on('login', async (userSelf) => {
                 log.debug(`on login: ${userSelf}`);
 
-                // 主动同步通讯录
-                await userSelf.sync();
-
                 this.contactSelf = userSelf;
 
                 this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
@@ -367,6 +364,16 @@ class PadProWechatBotAdapter extends BotAdapter {
                 });
 
                 await this._sendTextToFileHelper('已登录');
+
+
+                // 主动同步通讯录
+                await userSelf.sync();
+                // 向服务器发送联系人列表
+                const allContacts = await this.wechatyBot.Contact.findAll() || [];
+                const allContactsPayload = allContacts.map(contact => contact.payload);
+                await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
+
+                await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
             })
 
             // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
