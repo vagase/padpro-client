@@ -21,310 +21,8 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         this.contactSelf = null;
 
-        this._registerBotActions();
+        this._registerHubActions();
         this._setupObjectDecoders();
-    }
-
-    async _handleBotMessage(message) {
-        const MessageType = this.wechatyBot.Message.Type;
-
-        const preparePayload = async (message, xmlContent=false) => {
-            const payload = {};
-            payload['fromUser'] = message.from().id;
-            payload['fromUserName'] = message.from().name();
-            payload['content'] = message.text();
-
-            if (message.room()) {
-                payload['groupId'] = await message.room().id;
-                payload['groupName'] = await message.room().topic();
-
-                const mentions = await message.mention();
-                const mentionsContacts = mentions && mentions.map(m => this.decodeObject(m, BotAdapter.ObjectType.Contact)) || [];
-                if (mentionsContacts.length) {
-                    payload['atList'] = mentionsContacts;
-                }
-            }
-
-            if (xmlContent) {
-                let xml = await parseXml(payload['content']);
-                if (xml) {
-                    payload['content'] = xml;
-                }
-                else {
-                    log.error('message content is not xml format: ', xml);
-                }
-            }
-
-            return payload;
-        };
-
-        const handlersDict = {
-            [MessageType.Attachment]: (message) => {
-            },
-
-            [MessageType.Audio]: (message) => {
-            },
-
-            [MessageType.Contact]: async (message) => {
-            },
-
-            [MessageType.Emoticon]: async (message) => {
-                /**
-                 <msg>
-                 <emoji fromusername="vagase" tousername="wxid_4njphaafgcnb12" type="2" idbuffer="media:0_0" md5="aeb0975bbfa236b0d3ceb49f5d0066ec"
-                 len="35598" productid="com.tencent.xin.emoticon.person.stiker_1523884497529b0b6c6b473f5e" androidmd5="aeb0975bbfa236b0d3ceb49f5d0066ec"
-                 androidlen="35598" s60v3md5="aeb0975bbfa236b0d3ceb49f5d0066ec" s60v3len="35598" s60v5md5="aeb0975bbfa236b0d3ceb49f5d0066ec"
-                 s60v5len="35598" cdnurl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXyXPwcAxQDuRiaibU9vuztm34/"
-                 designerid="" thumburl="http://mmbiz.qpic.cn/mmemoticon/ajNVdqHZLLDOlsGtttOfyNbyecMWTWx5ibx8gOI3mxytnZ9MMTTABCdmxJl1T4N0B/0"
-                 encrypturl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXwicg3Mx0h7PR6ozGXfM9lII/"
-                 aeskey="886fd4cd528e2a4a39fec7b2a81b71c3" externurl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXyVupyicOjfxU4FPhb5ic1BKk/"
-                 externmd5="f62e4409732dc762bba157069dc7fcb7" width="240" height="240" tpurl="" tpauthkey="" attachedtext=""
-                 attachedtextcolor="" lensid=""></emoji>
-                 <gameext type="0" content="0"></gameext>
-                 </msg>
-                 * @type {*}
-                 */
-                const payload = await preparePayload(message, true);
-                this.sendHubEvent(BotAdapter.HubEvent.EMOJIMESSAGE, payload);
-            },
-
-            [MessageType.Image]: async (message) => {
-                /**
-                 <?xml version="1.0"?>
-                 <msg>
-                 <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11" cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0" cdnhdwidth="0" cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
-                 </msg>
-                 */
-
-                const payload = await preparePayload(message, true);
-
-                const imageId = this.contactSelf.id + "-" + uuidv4();
-                payload.imageId = imageId;
-
-                const fileBox = await message.toFileBox();
-                await fileBox.toFile(`cache/${imageId}`);
-
-                this.sendHubEvent(BotAdapter.HubEvent.IMAGEMESSAGE, payload);
-            },
-
-            [MessageType.Text]: async (message) => {
-                const text = message.text();
-                if (/ding/.test(text)) {
-                    await message.say('dong. receive: ' + text);
-                    return;
-                }
-
-                const payload = await preparePayload(message);
-                this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
-            },
-
-            [MessageType.Video]: (message) => {
-            },
-
-            [MessageType.Url]: async (message) => {
-                /**
-                 <?xml version="1.0"?>
-                 <msg>
-                 <appmsg appid="wx7217cc66fbed6d1d" sdkver="0">
-                 <title>【5.2折抢】Missha谜尚 谜尚红BB霜 SPF42+ PA+++ 50ml</title>
-                 <des>波罗蜜只卖￥87.1元，足足5.2折！还不快来抢！</des>
-                 <action />
-                 <type>5</type>
-                 <showtype>0</showtype>
-                 <soundtype>0</soundtype>
-                 <mediatagname />
-                 <messageext />
-                 <messageaction />
-                 <content />
-                 <contentattr>0</contentattr>
-                 <url>https://fx.bolo.me/module/landing/daiyanren.html?rev=https%3A%2F%2Ffx.bolo.me%2F%3Futm_term%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26utm_content%3Dsku_144240843157473_144240843180022%26utm_source%3Dwechat_friend%26utm_campaign%3Dapp_share%26utm_medium%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26source_type%3Dwechat_friend%26source_id%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%23%2Fproduct%2F144240843157473%3Fsku%3D144240843180022%26account%3Ddy_142571827670646&amp;user_id=142571827670646</url>
-                 <lowurl />
-                 <dataurl />
-                 <lowdataurl />
-                 <appattach>
-                 <totallen>0</totallen>
-                 <attachid />
-                 <emoticonmd5 />
-                 <fileext />
-                 <cdnthumburl>30570201000450304e02010002030192dd02032f565e020469ebce8c02045c89fe6c042a777875706c6f61645f777869645f346e6a706861616667636e6231323135315f313535323534373433360204010400030201000400</cdnthumburl>
-                 <cdnthumbmd5>74321bd4ca6b4fc7a3adf8f84bef9a79</cdnthumbmd5>
-                 <cdnthumblength>5064</cdnthumblength>
-                 <cdnthumbwidth>201</cdnthumbwidth>
-                 <cdnthumbheight>201</cdnthumbheight>
-                 <cdnthumbaeskey>f3c135a45d93d1298a45abbd64d385ca</cdnthumbaeskey>
-                 <aeskey>f3c135a45d93d1298a45abbd64d385ca</aeskey>
-                 <encryver>0</encryver>
-                 <filekey>wxid_4njphaafgcnb12151_1552547436</filekey>
-                 </appattach>
-                 <extinfo />
-                 <sourceusername />
-                 <sourcedisplayname />
-                 <thumburl />
-                 <md5 />
-                 <statextstr>GhQKEnd4NzIxN2NjNjZmYmVkNmQxZA==</statextstr>
-                 </appmsg>
-                 <fromusername>vagase</fromusername>
-                 <scene>0</scene>
-                 <appinfo>
-                 <version>2</version>
-                 <appname>波罗蜜日韩购</appname>
-                 </appinfo>
-                 <commenturl></commenturl>
-                 </msg>
-                 * @type {*}
-                 */
-
-                const payload = await preparePayload(message, true);
-                this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
-            },
-
-            [MessageType.MiniProgram]: async (message) => {
-                /**
-                 文本消息
-                 text
-
-                 图片消息
-                 <?xml version="1.0"?>
-                 <msg>
-                 <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11"
-                 cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
-                 cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0"
-                 cdnhdwidth="0"
-                 cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
-                 length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
-                 </msg>
-
-                 H5链接卡片
-                 <?xml version="1.0"?>
-                 <msg>
-                 <appmsg appid="wx7217cc66fbed6d1d" sdkver="0">
-                 <title>【5.2折抢】Missha谜尚 谜尚红BB霜 SPF42+ PA+++ 50ml</title>
-                 <des>波罗蜜只卖￥87.1元，足足5.2折！还不快来抢！</des>
-                 <action />
-                 <type>5</type>
-                 <showtype>0</showtype>
-                 <soundtype>0</soundtype>
-                 <mediatagname />
-                 <messageext />
-                 <messageaction />
-                 <content />
-                 <contentattr>0</contentattr>
-                 <url>
-                 https://fx.bolo.me/module/landing/daiyanren.html?rev=https%3A%2F%2Ffx.bolo.me%2F%3Futm_term%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26utm_content%3Dsku_144240843157473_144240843180022%26utm_source%3Dwechat_friend%26utm_campaign%3Dapp_share%26utm_medium%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26source_type%3Dwechat_friend%26source_id%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%23%2Fproduct%2F144240843157473%3Fsku%3D144240843180022%26account%3Ddy_142571827670646&amp;user_id=142571827670646
-                 </url>
-                 <lowurl />
-                 <dataurl />
-                 <lowdataurl />
-                 <appattach>
-                 <totallen>0</totallen>
-                 <attachid />
-                 <emoticonmd5 />
-                 <fileext />
-                 <cdnthumburl>
-                 30570201000450304e02010002030192dd02032f565e020469ebce8c02045c89fe6c042a777875706c6f61645f777869645f346e6a706861616667636e6231323135315f313535323534373433360204010400030201000400
-                 </cdnthumburl>
-                 <cdnthumbmd5>74321bd4ca6b4fc7a3adf8f84bef9a79</cdnthumbmd5>
-                 <cdnthumblength>5064</cdnthumblength>
-                 <cdnthumbwidth>201</cdnthumbwidth>
-                 <cdnthumbheight>201</cdnthumbheight>
-                 <cdnthumbaeskey>f3c135a45d93d1298a45abbd64d385ca</cdnthumbaeskey>
-                 <aeskey>f3c135a45d93d1298a45abbd64d385ca</aeskey>
-                 <encryver>0</encryver>
-                 <filekey>wxid_4njphaafgcnb12151_1552547436</filekey>
-                 </appattach>
-                 <extinfo />
-                 <sourceusername />
-                 <sourcedisplayname />
-                 <thumburl />
-                 <md5 />
-                 <statextstr>GhQKEnd4NzIxN2NjNjZmYmVkNmQxZA==</statextstr>
-                 </appmsg>
-                 <fromusername>vagase</fromusername>
-                 <scene>0</scene>
-                 <appinfo>
-                 <version>2</version>
-                 <appname>波罗蜜日韩购</appname>
-                 </appinfo>
-                 <commenturl></commenturl>
-                 </msg>
-
-                 小程序卡片
-
-                 <?xml version="1.0"?>
-                 <msg>
-                 <appmsg appid="" sdkver="0">
-                 <title>快来1.00元起拼【Armani 法国 阿玛尼 小胖丁唇釉 #506 3.9ml】</title>
-                 <des />
-                 <action />
-                 <type>33</type>
-                 <showtype>0</showtype>
-                 <soundtype>0</soundtype>
-                 <mediatagname />
-                 <messageext />
-                 <messageaction />
-                 <content />
-                 <contentattr>0</contentattr>
-                 <url>https://mp.weixin.qq.com/mp/waerrpage?appid=wx979574d8814e4a12&amp;type=upgrade&amp;upgradetype=3#wechat_redirect</url>
-                 <lowurl />
-                 <dataurl />
-                 <lowdataurl />
-                 <appattach>
-                 <totallen>0</totallen>
-                 <attachid />
-                 <emoticonmd5 />
-                 <fileext />
-                 <cdnthumburl>30570201000450304e02010002030192dd02033d11fd0204a93e5b6502045c9b4557042a777875706c6f61645f777869645f346e6a706861616667636e6231323138375f313535333637393730330204010400030201000400</cdnthumburl>
-                 <cdnthumbmd5>b85dfb7b1ed5ee7257c96902358bc708</cdnthumbmd5>
-                 <cdnthumblength>22867</cdnthumblength>
-                 <cdnthumbwidth>750</cdnthumbwidth>
-                 <cdnthumbheight>567</cdnthumbheight>
-                 <cdnthumbaeskey>d3317bee189c367ade3d7256f307d2d8</cdnthumbaeskey>
-                 <aeskey>d3317bee189c367ade3d7256f307d2d8</aeskey>
-                 <encryver>0</encryver>
-                 <filekey>wxid_4njphaafgcnb12187_1553679703</filekey>
-                 </appattach>
-                 <extinfo />
-                 <sourceusername>gh_25db1e00370d@app</sourceusername>
-                 <sourcedisplayname>正常种草馆</sourcedisplayname>
-                 <thumburl />
-                 <md5 />
-                 <statextstr />
-                 <weappinfo>
-                 <username><![CDATA[gh_25db1e00370d@app]]></username>
-                 <appid><![CDATA[wx979574d8814e4a12]]></appid>
-                 <type>2</type>
-                 <version>41</version>
-                 <weappiconurl><![CDATA[http://mmbiz.qpic.cn/mmbiz_png/5FG1kxO4sI5maibHJlCChJM2ZbibCJ1jhXQ77GNeHP5Iu8vX2v71NicNSxIL8VzbROdyUzErHkt9Tev6icJK6sE31g/640?wx_fmt=png&wxfrom=200]]></weappiconurl>
-                 <pagepath><![CDATA[pages/share/index.html?url=bolome%3A%2F%2Fentity%2FGroupPurchaseGroupPageEntity%3Fgroup_id%3D29b1fa37aa895359172428c0f450140f&utm_medium=userid_152752156401456]]></pagepath>
-                 <shareId><![CDATA[0_wx979574d8814e4a12_103133_1553679700_0]]></shareId>
-                 <appservicetype>0</appservicetype>
-                 </weappinfo>
-                 </appmsg>
-                 <fromusername>vagase</fromusername>
-                 <scene>0</scene>
-                 <appinfo>
-                 <version>1</version>
-                 <appname></appname>
-                 </appinfo>
-                 <commenturl></commenturl>
-                 </msg>
-                 */
-                const payload = await preparePayload(message, true);
-                this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
-            },
-
-            [MessageType.Unknown]: (message) => {
-                log.error('MessageType.Unknow: ' + message.toString());
-            },
-        };
-
-        const handler = handlersDict[message.type()];
-        if (handler) {
-            return handler(message);
-        }
-        else {
-            throw 'unhandled message: ' + message.toString();
-        }
     }
 
     _newWechatyBot() {
@@ -336,117 +34,12 @@ class PadProWechatBotAdapter extends BotAdapter {
         //     puppet
         // });
 
-        const result = new Wechaty({
+        return new Wechaty({
             puppet: 'wechaty-puppet-padchat',
             puppetOptions: {
                 token: 'puppet_padchat_a8f8e6a2b9463ee8',
             },
         });
-
-        /**
-         * 1. 关于 on.login、on.logout、on.error
-         *  机器人登录了(on.login)，因为一些问题（比如网络）可能调用 on.logout 或 on.error。
-         *  之后机器人会继续尝试登录，当登录成功后会继续调用 on.login
-         */
-
-        result
-        // emit when the bot needs to show you a QR Code for scanning
-            .on('scan', async (url, status) => {
-                const QRImageURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}`;
-                log.debug(`on scan: ${QRImageURL} ${status}`);
-
-                const qrURLData = await qrcode.toDataURL(url);
-                this.sendHubEvent(BotAdapter.HubEvent.LOGIN_SCAN, {url: qrURLData, status: status});
-            })
-
-            // emit after bot login full successful
-            .on('login', async (userSelf) => {
-                log.debug(`on login: ${userSelf}`);
-
-                this.contactSelf = userSelf;
-
-                this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
-                    userName: userSelf.id
-                });
-
-                await this._sendTextToFileHelper('已登录');
-
-
-                // 主动同步通讯录
-                await userSelf.sync();
-                // 向服务器发送联系人列表
-                const allContacts = await this.wechatyBot.Contact.findAll() || [];
-                const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
-                await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
-
-                await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
-            })
-
-            // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
-            .on('ready', async () => {
-                log.debug(`on ready`);
-
-                // 当联系人和聊天都同步好后，给文件助手发一条消息
-                await this._sendTextToFileHelper('已完成同步');
-            })
-
-            // emit after the bot log out
-            .on('logout', async (userSelf) => {
-                log.debug(`on logout: ${userSelf}`);
-
-                this.sendHubEvent(BotAdapter.HubEvent.LOGOUT_DONE, '用户已主动登出');
-            })
-
-            // When the bot get error, there will be a Wechaty error event fired.
-            .on('error', async (error) => {
-                log.debug(`on error: ${error}`);
-            })
-
-            // Get bot’s heartbeat.
-            .on('heartbeat', (data) => {
-            })
-
-            // emit when someone sends bot a friend request
-            .on('friendship', (friendship) => {
-                log.debug(`on friendship: ${friendship}`);
-
-                const payload = this.decodeObject(friendship, BotAdapter.ObjectType.Friendship, {fullfill: true});
-                this.sendHubEvent(BotAdapter.HubEvent.FRIEND_REQUEST, payload);
-            })
-
-            // 	emit when there's a new message
-            .on('message', async (message) => {
-                log.debug(`on message: ${message.toString()}`);
-
-                // 仅推送30秒之前的数据
-                if (message.age() >= 30*60) {
-                    return;
-                }
-
-                await this._handleBotMessage(message);
-            })
-
-            // emit when anyone join any room
-            .on('room-join', (room, inviteeList) => {
-                log.debug(`on room-join: ${room} ${inviteeList}`);
-            })
-
-            // emit when someone change room topic
-            .on('room-topic', (room, newTopic, oldTopic, changer) => {
-                log.debug(`on room-topic: ${room} ${newTopic} ${oldTopic} ${changer}`);
-            })
-
-            // emit when anyone leave the room
-            .on('room-leave', (room, leaverList) => {
-                log.debug(`on room-leave: ${room} ${leaverList}`);
-            })
-
-            // emit when there is a room invitation
-            .on('room-invite', (room, inviterList) => {
-                log.debug(`on room-invite: ${room} ${inviterList}`);
-            });
-
-        return result;
     }
 
     async _sendTextToFileHelper(text) {
@@ -522,6 +115,413 @@ class PadProWechatBotAdapter extends BotAdapter {
     }
 
     _registerBotActions() {
+        const _handleBotMessage = async (message) => {
+            const MessageType = this.wechatyBot.Message.Type;
+
+            const preparePayload = async (message, xmlContent=false) => {
+                const payload = {};
+                payload['fromUser'] = message.from().id;
+                payload['fromUserName'] = message.from().name();
+                payload['content'] = message.text();
+
+                if (message.room()) {
+                    payload['groupId'] = await message.room().id;
+                    payload['groupName'] = await message.room().topic();
+
+                    const mentions = await message.mention();
+                    const mentionsContacts = mentions && mentions.map(m => this.decodeObject(m, BotAdapter.ObjectType.Contact)) || [];
+                    if (mentionsContacts.length) {
+                        payload['atList'] = mentionsContacts;
+                    }
+                }
+
+                if (xmlContent) {
+                    let xml = await parseXml(payload['content']);
+                    if (xml) {
+                        payload['content'] = xml;
+                    }
+                    else {
+                        log.error('message content is not xml format: ', xml);
+                    }
+                }
+
+                return payload;
+            };
+
+            const handlersDict = {
+                [MessageType.Attachment]: (message) => {
+                },
+
+                [MessageType.Audio]: (message) => {
+                },
+
+                [MessageType.Contact]: async (message) => {
+                },
+
+                [MessageType.Emoticon]: async (message) => {
+                    /**
+                     <msg>
+                     <emoji fromusername="vagase" tousername="wxid_4njphaafgcnb12" type="2" idbuffer="media:0_0" md5="aeb0975bbfa236b0d3ceb49f5d0066ec"
+                     len="35598" productid="com.tencent.xin.emoticon.person.stiker_1523884497529b0b6c6b473f5e" androidmd5="aeb0975bbfa236b0d3ceb49f5d0066ec"
+                     androidlen="35598" s60v3md5="aeb0975bbfa236b0d3ceb49f5d0066ec" s60v3len="35598" s60v5md5="aeb0975bbfa236b0d3ceb49f5d0066ec"
+                     s60v5len="35598" cdnurl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXyXPwcAxQDuRiaibU9vuztm34/"
+                     designerid="" thumburl="http://mmbiz.qpic.cn/mmemoticon/ajNVdqHZLLDOlsGtttOfyNbyecMWTWx5ibx8gOI3mxytnZ9MMTTABCdmxJl1T4N0B/0"
+                     encrypturl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXwicg3Mx0h7PR6ozGXfM9lII/"
+                     aeskey="886fd4cd528e2a4a39fec7b2a81b71c3" externurl="http://emoji.qpic.cn/wx_emoji/ydZXa4cljfLicPHsB99gf9QIwAsY2CdZz0CicovRqjmXyVupyicOjfxU4FPhb5ic1BKk/"
+                     externmd5="f62e4409732dc762bba157069dc7fcb7" width="240" height="240" tpurl="" tpauthkey="" attachedtext=""
+                     attachedtextcolor="" lensid=""></emoji>
+                     <gameext type="0" content="0"></gameext>
+                     </msg>
+                     * @type {*}
+                     */
+                    const payload = await preparePayload(message, true);
+                    this.sendHubEvent(BotAdapter.HubEvent.EMOJIMESSAGE, payload);
+                },
+
+                [MessageType.Image]: async (message) => {
+                    /**
+                     <?xml version="1.0"?>
+                     <msg>
+                     <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11" cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0" cdnhdwidth="0" cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400" length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
+                     </msg>
+                     */
+
+                    const payload = await preparePayload(message, true);
+
+                    const imageId = this.contactSelf.id + "-" + uuidv4();
+                    payload.imageId = imageId;
+
+                    const fileBox = await message.toFileBox();
+                    await fileBox.toFile(`cache/${imageId}`);
+
+                    this.sendHubEvent(BotAdapter.HubEvent.IMAGEMESSAGE, payload);
+                },
+
+                [MessageType.Text]: async (message) => {
+                    const text = message.text();
+                    if (/ding/.test(text)) {
+                        await message.say('dong. receive: ' + text);
+                        return;
+                    }
+
+                    const payload = await preparePayload(message);
+                    this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
+                },
+
+                [MessageType.Video]: (message) => {
+                },
+
+                [MessageType.Url]: async (message) => {
+                    /**
+                     <?xml version="1.0"?>
+                     <msg>
+                     <appmsg appid="wx7217cc66fbed6d1d" sdkver="0">
+                     <title>【5.2折抢】Missha谜尚 谜尚红BB霜 SPF42+ PA+++ 50ml</title>
+                     <des>波罗蜜只卖￥87.1元，足足5.2折！还不快来抢！</des>
+                     <action />
+                     <type>5</type>
+                     <showtype>0</showtype>
+                     <soundtype>0</soundtype>
+                     <mediatagname />
+                     <messageext />
+                     <messageaction />
+                     <content />
+                     <contentattr>0</contentattr>
+                     <url>https://fx.bolo.me/module/landing/daiyanren.html?rev=https%3A%2F%2Ffx.bolo.me%2F%3Futm_term%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26utm_content%3Dsku_144240843157473_144240843180022%26utm_source%3Dwechat_friend%26utm_campaign%3Dapp_share%26utm_medium%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26source_type%3Dwechat_friend%26source_id%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%23%2Fproduct%2F144240843157473%3Fsku%3D144240843180022%26account%3Ddy_142571827670646&amp;user_id=142571827670646</url>
+                     <lowurl />
+                     <dataurl />
+                     <lowdataurl />
+                     <appattach>
+                     <totallen>0</totallen>
+                     <attachid />
+                     <emoticonmd5 />
+                     <fileext />
+                     <cdnthumburl>30570201000450304e02010002030192dd02032f565e020469ebce8c02045c89fe6c042a777875706c6f61645f777869645f346e6a706861616667636e6231323135315f313535323534373433360204010400030201000400</cdnthumburl>
+                     <cdnthumbmd5>74321bd4ca6b4fc7a3adf8f84bef9a79</cdnthumbmd5>
+                     <cdnthumblength>5064</cdnthumblength>
+                     <cdnthumbwidth>201</cdnthumbwidth>
+                     <cdnthumbheight>201</cdnthumbheight>
+                     <cdnthumbaeskey>f3c135a45d93d1298a45abbd64d385ca</cdnthumbaeskey>
+                     <aeskey>f3c135a45d93d1298a45abbd64d385ca</aeskey>
+                     <encryver>0</encryver>
+                     <filekey>wxid_4njphaafgcnb12151_1552547436</filekey>
+                     </appattach>
+                     <extinfo />
+                     <sourceusername />
+                     <sourcedisplayname />
+                     <thumburl />
+                     <md5 />
+                     <statextstr>GhQKEnd4NzIxN2NjNjZmYmVkNmQxZA==</statextstr>
+                     </appmsg>
+                     <fromusername>vagase</fromusername>
+                     <scene>0</scene>
+                     <appinfo>
+                     <version>2</version>
+                     <appname>波罗蜜日韩购</appname>
+                     </appinfo>
+                     <commenturl></commenturl>
+                     </msg>
+                     * @type {*}
+                     */
+
+                    const payload = await preparePayload(message, true);
+                    this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
+                },
+
+                [MessageType.MiniProgram]: async (message) => {
+                    /**
+                     文本消息
+                     text
+
+                     图片消息
+                     <?xml version="1.0"?>
+                     <msg>
+                     <img aeskey="3820e3f776a09eac131488507aa73a11" encryver="1" cdnthumbaeskey="3820e3f776a09eac131488507aa73a11"
+                     cdnthumburl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
+                     cdnthumblength="3656" cdnthumbheight="67" cdnthumbwidth="120" cdnmidheight="0" cdnmidwidth="0" cdnhdheight="0"
+                     cdnhdwidth="0"
+                     cdnmidimgurl="30500201000449304702010002040efc543e02032f56c30204a8af947502045c9b284d0422373838363134373430344063686174726f6f6d313735355f313535333637323236390204010800020201000400"
+                     length="12661" md5="768dcc20cf6c47c24ad2f1b9824907e0" />
+                     </msg>
+
+                     H5链接卡片
+                     <?xml version="1.0"?>
+                     <msg>
+                     <appmsg appid="wx7217cc66fbed6d1d" sdkver="0">
+                     <title>【5.2折抢】Missha谜尚 谜尚红BB霜 SPF42+ PA+++ 50ml</title>
+                     <des>波罗蜜只卖￥87.1元，足足5.2折！还不快来抢！</des>
+                     <action />
+                     <type>5</type>
+                     <showtype>0</showtype>
+                     <soundtype>0</soundtype>
+                     <mediatagname />
+                     <messageext />
+                     <messageaction />
+                     <content />
+                     <contentattr>0</contentattr>
+                     <url>
+                     https://fx.bolo.me/module/landing/daiyanren.html?rev=https%3A%2F%2Ffx.bolo.me%2F%3Futm_term%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26utm_content%3Dsku_144240843157473_144240843180022%26utm_source%3Dwechat_friend%26utm_campaign%3Dapp_share%26utm_medium%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%26source_type%3Dwechat_friend%26source_id%3DCC751EB4-BDC8-4682-8E51-D2636FB405F2%23%2Fproduct%2F144240843157473%3Fsku%3D144240843180022%26account%3Ddy_142571827670646&amp;user_id=142571827670646
+                     </url>
+                     <lowurl />
+                     <dataurl />
+                     <lowdataurl />
+                     <appattach>
+                     <totallen>0</totallen>
+                     <attachid />
+                     <emoticonmd5 />
+                     <fileext />
+                     <cdnthumburl>
+                     30570201000450304e02010002030192dd02032f565e020469ebce8c02045c89fe6c042a777875706c6f61645f777869645f346e6a706861616667636e6231323135315f313535323534373433360204010400030201000400
+                     </cdnthumburl>
+                     <cdnthumbmd5>74321bd4ca6b4fc7a3adf8f84bef9a79</cdnthumbmd5>
+                     <cdnthumblength>5064</cdnthumblength>
+                     <cdnthumbwidth>201</cdnthumbwidth>
+                     <cdnthumbheight>201</cdnthumbheight>
+                     <cdnthumbaeskey>f3c135a45d93d1298a45abbd64d385ca</cdnthumbaeskey>
+                     <aeskey>f3c135a45d93d1298a45abbd64d385ca</aeskey>
+                     <encryver>0</encryver>
+                     <filekey>wxid_4njphaafgcnb12151_1552547436</filekey>
+                     </appattach>
+                     <extinfo />
+                     <sourceusername />
+                     <sourcedisplayname />
+                     <thumburl />
+                     <md5 />
+                     <statextstr>GhQKEnd4NzIxN2NjNjZmYmVkNmQxZA==</statextstr>
+                     </appmsg>
+                     <fromusername>vagase</fromusername>
+                     <scene>0</scene>
+                     <appinfo>
+                     <version>2</version>
+                     <appname>波罗蜜日韩购</appname>
+                     </appinfo>
+                     <commenturl></commenturl>
+                     </msg>
+
+                     小程序卡片
+
+                     <?xml version="1.0"?>
+                     <msg>
+                     <appmsg appid="" sdkver="0">
+                     <title>快来1.00元起拼【Armani 法国 阿玛尼 小胖丁唇釉 #506 3.9ml】</title>
+                     <des />
+                     <action />
+                     <type>33</type>
+                     <showtype>0</showtype>
+                     <soundtype>0</soundtype>
+                     <mediatagname />
+                     <messageext />
+                     <messageaction />
+                     <content />
+                     <contentattr>0</contentattr>
+                     <url>https://mp.weixin.qq.com/mp/waerrpage?appid=wx979574d8814e4a12&amp;type=upgrade&amp;upgradetype=3#wechat_redirect</url>
+                     <lowurl />
+                     <dataurl />
+                     <lowdataurl />
+                     <appattach>
+                     <totallen>0</totallen>
+                     <attachid />
+                     <emoticonmd5 />
+                     <fileext />
+                     <cdnthumburl>30570201000450304e02010002030192dd02033d11fd0204a93e5b6502045c9b4557042a777875706c6f61645f777869645f346e6a706861616667636e6231323138375f313535333637393730330204010400030201000400</cdnthumburl>
+                     <cdnthumbmd5>b85dfb7b1ed5ee7257c96902358bc708</cdnthumbmd5>
+                     <cdnthumblength>22867</cdnthumblength>
+                     <cdnthumbwidth>750</cdnthumbwidth>
+                     <cdnthumbheight>567</cdnthumbheight>
+                     <cdnthumbaeskey>d3317bee189c367ade3d7256f307d2d8</cdnthumbaeskey>
+                     <aeskey>d3317bee189c367ade3d7256f307d2d8</aeskey>
+                     <encryver>0</encryver>
+                     <filekey>wxid_4njphaafgcnb12187_1553679703</filekey>
+                     </appattach>
+                     <extinfo />
+                     <sourceusername>gh_25db1e00370d@app</sourceusername>
+                     <sourcedisplayname>正常种草馆</sourcedisplayname>
+                     <thumburl />
+                     <md5 />
+                     <statextstr />
+                     <weappinfo>
+                     <username><![CDATA[gh_25db1e00370d@app]]></username>
+                     <appid><![CDATA[wx979574d8814e4a12]]></appid>
+                     <type>2</type>
+                     <version>41</version>
+                     <weappiconurl><![CDATA[http://mmbiz.qpic.cn/mmbiz_png/5FG1kxO4sI5maibHJlCChJM2ZbibCJ1jhXQ77GNeHP5Iu8vX2v71NicNSxIL8VzbROdyUzErHkt9Tev6icJK6sE31g/640?wx_fmt=png&wxfrom=200]]></weappiconurl>
+                     <pagepath><![CDATA[pages/share/index.html?url=bolome%3A%2F%2Fentity%2FGroupPurchaseGroupPageEntity%3Fgroup_id%3D29b1fa37aa895359172428c0f450140f&utm_medium=userid_152752156401456]]></pagepath>
+                     <shareId><![CDATA[0_wx979574d8814e4a12_103133_1553679700_0]]></shareId>
+                     <appservicetype>0</appservicetype>
+                     </weappinfo>
+                     </appmsg>
+                     <fromusername>vagase</fromusername>
+                     <scene>0</scene>
+                     <appinfo>
+                     <version>1</version>
+                     <appname></appname>
+                     </appinfo>
+                     <commenturl></commenturl>
+                     </msg>
+                     */
+                    const payload = await preparePayload(message, true);
+                    this.sendHubEvent(BotAdapter.HubEvent.MESSAGE, payload);
+                },
+
+                [MessageType.Unknown]: (message) => {
+                    log.error('MessageType.Unknow: ' + message.toString());
+                },
+            };
+
+            const handler = handlersDict[message.type()];
+            if (handler) {
+                return handler(message);
+            }
+            else {
+                throw 'unhandled message: ' + message.toString();
+            }
+        };
+
+        /**
+         * 1. 关于 on.login、on.logout、on.error
+         *  机器人登录了(on.login)，因为一些问题（比如网络）可能调用 on.logout 或 on.error。
+         *  之后机器人会继续尝试登录，当登录成功后会继续调用 on.login
+         */
+
+        this.wechatyBot
+        // emit when the bot needs to show you a QR Code for scanning
+            .on('scan', async (url, status) => {
+                const QRImageURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}`;
+                log.debug(`on scan: ${QRImageURL} ${status}`);
+
+                const qrURLData = await qrcode.toDataURL(url);
+                this.sendHubEvent(BotAdapter.HubEvent.LOGIN_SCAN, {url: qrURLData, status: status});
+            })
+
+            // emit after bot login full successful
+            .on('login', async (userSelf) => {
+                log.debug(`on login: ${userSelf}`);
+
+                this.contactSelf = userSelf;
+
+                this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
+                    userName: userSelf.id
+                });
+
+                await this._sendTextToFileHelper('已登录');
+
+
+                // 主动同步通讯录
+                await userSelf.sync();
+                // 向服务器发送联系人列表
+                const allContacts = await this.wechatyBot.Contact.findAll() || [];
+                const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
+                await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
+
+                await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
+            })
+
+            // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
+            .on('ready', async () => {
+                log.debug(`on ready`);
+
+                // 当联系人和聊天都同步好后，给文件助手发一条消息
+                await this._sendTextToFileHelper('已完成同步');
+            })
+
+            // emit after the bot log out
+            .on('logout', async (userSelf) => {
+                log.debug(`on logout: ${userSelf}`);
+
+                this.sendHubEvent(BotAdapter.HubEvent.LOGOUT_DONE, '用户已主动登出');
+            })
+
+            // When the bot get error, there will be a Wechaty error event fired.
+            .on('error', async (error) => {
+                log.debug(`on error: ${error}`);
+            })
+
+            // Get bot’s heartbeat.
+            .on('heartbeat', (data) => {
+            })
+
+            // emit when someone sends bot a friend request
+            .on('friendship', (friendship) => {
+                log.debug(`on friendship: ${friendship}`);
+
+                const payload = this.decodeObject(friendship, BotAdapter.ObjectType.Friendship, {fullfill: true});
+                this.sendHubEvent(BotAdapter.HubEvent.FRIEND_REQUEST, payload);
+            })
+
+            // 	emit when there's a new message
+            .on('message', async (message) => {
+                log.debug(`on message: ${message.toString()}`);
+
+                // 仅推送30秒之前的数据
+                if (message.age() >= 30*60) {
+                    return;
+                }
+
+                await _handleBotMessage(message);
+            })
+
+            // emit when anyone join any room
+            .on('room-join', (room, inviteeList) => {
+                log.debug(`on room-join: ${room} ${inviteeList}`);
+            })
+
+            // emit when someone change room topic
+            .on('room-topic', (room, newTopic, oldTopic, changer) => {
+                log.debug(`on room-topic: ${room} ${newTopic} ${oldTopic} ${changer}`);
+            })
+
+            // emit when anyone leave the room
+            .on('room-leave', (room, leaverList) => {
+                log.debug(`on room-leave: ${room} ${leaverList}`);
+            })
+
+            // emit when there is a room invitation
+            .on('room-invite', (room, inviterList) => {
+                log.debug(`on room-invite: ${room} ${inviterList}`);
+            });
+    }
+
+    _registerHubActions() {
         /**
          * @toUserName:
          * - to user: wx1234124
@@ -849,6 +849,9 @@ class PadProWechatBotAdapter extends BotAdapter {
         }
 
         this.wechatyBot = this._newWechatyBot();
+
+        this._registerBotActions();
+
         return this.wechatyBot.start();
     }
 
