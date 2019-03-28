@@ -37,6 +37,12 @@ class PadProWechatBotAdapter extends BotAdapter {
             if (message.room()) {
                 payload['groupId'] = await message.room().id;
                 payload['groupName'] = await message.room().topic();
+
+                const mentions = await message.mention();
+                const mentionsContacts = mentions && mentions.map(m => this.decodeObject(m, BotAdapter.ObjectType.Contact)) || [];
+                if (mentionsContacts.length) {
+                    payload['atList'] = mentionsContacts;
+                }
             }
 
             if (xmlContent) {
@@ -370,7 +376,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 await userSelf.sync();
                 // 向服务器发送联系人列表
                 const allContacts = await this.wechatyBot.Contact.findAll() || [];
-                const allContactsPayload = allContacts.map(contact => contact.payload);
+                const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
                 await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
 
                 await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
