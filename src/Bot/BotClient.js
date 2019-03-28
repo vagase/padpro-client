@@ -7,6 +7,8 @@ const _ = require('lodash');
 const BotAdapter = require('./BotAdapter');
 const EventEmitter = require('events');
 
+const mutePingPongLog = true;
+
 /**
  * BotClient is the middle proxy between hub and client.
  * - communicate with hub with grpc long connection
@@ -87,7 +89,7 @@ class BotClient extends EventEmitter {
         const clientType = event.getClienttype();
 
         if (eventType === 'PONG') {
-            log.info("PONG " + clientType + " " + clientId);
+            !mutePingPongLog && log.debug("PONG " + clientType + " " + clientId);
             return;
         }
 
@@ -171,7 +173,12 @@ class BotClient extends EventEmitter {
             }
         }
 
-        log.info(`tunnel send: [${eventType}] ${bodyStr}`);
+        if (eventType === 'PING') {
+            !mutePingPongLog && log.debug(`tunnel send: [${eventType}] ${bodyStr}`);
+        }
+        else {
+            log.debug(`tunnel send: [${eventType}] ${bodyStr}`);
+        }
 
         const newEventRequest = (eventType, body) => {
             const req = new messages.EventRequest();
