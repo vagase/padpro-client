@@ -502,7 +502,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             .on('friendship', (friendship) => {
                 log.debug(`on friendship: ${friendship}`);
 
-                const payload = this.decodeObject(friendship, BotAdapter.ObjectType.Friendship, {fullfill: true});
+                const payload = this.decodeObject(friendship, BotAdapter.ObjectType.Friendship );
                 this.sendHubEvent(BotAdapter.HubEvent.FRIEND_REQUEST, payload);
             })
 
@@ -587,17 +587,30 @@ class PadProWechatBotAdapter extends BotAdapter {
             await target.say(file);
         });
 
-        this.registerHubAction("AcceptUser", async (actionBody) => {
-            let stranger = actionBody.stranger;
-            let ticket = actionBody.ticket;
-            if (stranger === undefined || ticket === undefined ) {
-                log.error("accept user message empty")
-                return;
+
+        this.registerHubAction("AcceptUser", async (payload) => {
+            /**
+             * payload:
+             * {
+                  "contactId": "wxid_b7rvs8pdawnu21",
+                  "hello": "我是潘小强",
+                  "id": "7652425311615249121",
+                  "stranger": "v1_1959335e949eba970bc8d3da307f1e2c4237bc5a4ceb7c40cfddadcbb77f32c50fe8ee3c0a63a302a280845fce9f5bec@stranger",
+                  "ticket": "v2_acd0f0a71df04f222ff4d9c8910da209688b5e372dd555f354017dff2be772e547d09b257d99eaa9405c7fa956a663c1218ec705c8632616cde8e137b9cbae88@stranger",
+                  "type": 2
+                }
+             */
+
+            // 通过 payload 重建 friendship 对象
+            const friendShip = this.wechatyBot.Friendship.load(payload.id);
+            friendShip.payload = payload;
+
+            friendShip.puppet.cacheFriendshipPayload.set(payload.id, payload);
+
+            const type = friendShip.type();
+            if (type === this.wechatyBot.Friendship.Type.Receive) {
+                await friendShip.accept();
             }
-
-            // const frendship = Friendship.load()
-
-            // TODO:
         });
 
         this.registerHubAction("AddContact", async (actionBody) => {
