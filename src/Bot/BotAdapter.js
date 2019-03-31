@@ -22,7 +22,7 @@ class BotAdapter {
             throw `unsupported bot action: ${actionType}}`;
         }
 
-        return await actionHandler(actionBody);
+        return await actionHandler(JSON.parse(actionBody));
     }
 
     registerBotCallback(name, func) {

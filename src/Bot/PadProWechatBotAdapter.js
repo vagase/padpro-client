@@ -43,75 +43,84 @@ class PadProWechatBotAdapter extends BotAdapter {
     }
 
     async _sendTextToFileHelper(text) {
-        const contact = await this._findContact('文件传输助手');
+        const contact = (await this._findContacts({name: '文件传输助手'}))[0];
         const time = moment().format('YYYY-MM-DD HH:mm:ss');
         return contact.say(`${time}\n${text}`);
     }
 
-    async _findContact(name, alias) {
-        const query = {};
-        if (name) {
-            query['name'] = name;
-        }
-        if (alias) {
-            query['alias'] = alias;
+    /**
+     * @param query
+     * {
+     *     id: '',
+     *     name: '',
+     *     alias: ''
+     * }
+     * @private
+     */
+    async _findContacts(query = {}) {
+        // 因为 wechaty api 限制，不能通过 id 搜索 contact，特此添加通过 id 搜索 contact
+        const newQuery = Object.assign({}, query);
+        delete newQuery.id;
+
+        let contacts = await this.wechatyBot.Contact.findAll(newQuery);
+
+        if (query.id) {
+            contacts =  contacts.filter(contact => {
+                return contact.id === query.id;
+            });
         }
 
-        const contact = await this.wechatyBot.Contact.find(query);
-        if (!contact) {
-            throw `contact is not found: ${JSON.stringify(query)}`;
-        }
-
-        return contact;
+        return contacts;
     }
 
-    async _findRoom(topic) {
-        const query = {};
-        if (topic) {
-            query['topic'] = topic;
+    /**
+     *
+     * @param query
+     * {
+     *     id: '',
+     *     topic: '',
+     * }
+     * @private
+     */
+    async _findRooms(query = {}) {
+        // 因为 wechaty api 限制，不支持通过 id 搜索 room，特此添加通过 id 搜索 room。
+
+        const newQuery = Object.assign({}, query);
+        delete newQuery.id;
+
+        let rooms = await this.wechatyBot.Room.findAll(newQuery);
+
+        if (query.id) {
+            rooms = rooms.filter(room => {
+                return room.id === query.id;
+            });
         }
 
-        const room = await this.wechatyBot.Room.find({topic: topic});
-        if (!room) {
-            throw  `room is not found: ${JSON.stringify(query)}`;
-        }
-
-        return room;
+        return rooms;
     }
 
-    async _findTarget(id,  actionName) {
-        // to room
+    /**
+     * @param id
+     * @return {Promise<*>}
+     * @private
+     */
+    async _findTargetsById(id) {
         if (id.indexOf('@chatroom') !== -1) {
-            const roomId = id.split('@')[0];
-            // TODO:
-            const room = await this.wechatyBot.Room.find({topic: roomId});
-            if (!room) {
-                let error = actionName ? `${actionName} failed, ` : '';
-                error += `room is not found: ${id}`;
-                throw error;
-            }
-
-            return room;
+            return this._findRooms({ id });
         }
-        // to contact
         else {
-            // TODO
-            const contact = await this.wechatyBot.Contact.find({name: id});
-            if (!contact) {
-                let error = actionName ? `${actionName} failed, ` : '';
-                error += `contact is not found: ${id}`;
-                throw error;
-            }
-
-            return contact;
+            return this._findContacts({ id });
         }
     }
 
-    async _findTargetList(idList, actionName) {
-        // concurrent find
-        return await Promise.all(idList.map(id => {
-            return this._findTarget(id, actionName);
-        }));
+    /**
+     * @param id
+     * @return {Promise<*>}
+     * @private
+     */
+    async _findTargetById(id) {
+        const targets = await this._findTargetsById(id);
+        return targets && targets[0];
     }
 
     _registerBotActions() {
@@ -454,6 +463,12 @@ class PadProWechatBotAdapter extends BotAdapter {
                 await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
 
                 await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
+
+                const rooms = await this.wechatyBot.Room.findAll();
+                console.log(rooms);
+
+                const room = await this.wechatyBot.Room.find({topic: 'kol-explorer'});
+                console.log(room);
             })
 
             // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
@@ -536,7 +551,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return;
             }
 
-            const target = await this._findTarget(toUserName, 'SendTextMessage');
+            const target = await this._findTargetById(toUserName);
 
             // TODO: test, and other format message
             await target.say(content)
@@ -550,7 +565,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return;
             }
 
-            const target = await this._findTarget(toUserName, 'SendAppMessage');
+            const target = await this._findTargetById(toUserName);
 
             // TODO:
         });
@@ -567,7 +582,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let buffer = fs.readFileSync(`cache/${imageId}`);
             const file = FileBox.fromBuffer(buffer, 'image');
 
-            const target = await this._findTarget(toUserName, 'SendImageResourceMessage');
+            const target = await this._findTargetById(toUserName);
             await target.say(file);
         });
 
@@ -594,7 +609,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const contact = await this._findTarget(stranger, 'AddContact');
+            const contact = await this._findTargetById(stranger);
             await this.wechatyBot.Friendship.add(contact, content);
         });
 
@@ -607,7 +622,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return;
             }
 
-            const contact = await this._findTarget(stranger, 'AddContact');
+            const contact = await this._findTargetById(stranger);
             await this.wechatyBot.Friendship.add(contact, content);
         });
 
@@ -618,7 +633,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            return this._findTarget(userId, 'GetContact');
+            return this._findTargetById(userId);
         });
 
         this.registerHubAction("CreateRoom", async (actionBody) => {
@@ -629,7 +644,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const contacts = await this._findTargetList(userList, 'CreateRoom');
+            const contacts = await this._findContacts({name: new RegExp(userList.join('|'))});
             await this.wechatyBot.Room.create(contacts, '');
         });
 
@@ -640,7 +655,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const room = await this._findTarget(groupId, 'GetRoomMembers');
+            const room = await this._findTargetById(groupId);
             return room.memberAll();
         });
 
@@ -651,7 +666,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const room = await this._findTarget(groupId, 'GetRoomQRCode');
+            const room = await this._findTargetById(groupId);
             return room.qrcode();
         });
 
@@ -663,8 +678,8 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return;
             }
 
-            const contact = await this._findTarget(userId, 'AddRoomMember');
-            const room = await this._findTarget(groupId, 'AddRoomMember');
+            const contact = await this._findTargetById(userId);
+            const room = await this._findTargetById(groupId);
             await room.add(contact);
         });
 
@@ -676,8 +691,8 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const contact = await this._findTarget(userId, 'InviteRoomMember');
-            const room = await this._findTarget(groupId, 'InviteRoomMember');
+            const contact = await this._findTargetById(userId);
+            const room = await this._findTargetById(groupId);
             await room.add(contact);
         });
 
@@ -689,8 +704,8 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const contact = await this._findTarget(userId, 'DeleteRoomMember');
-            const room = await this._findTarget(groupId, 'DeleteRoomMember');
+            const contact = await this._findTargetById(userId);
+            const room = await this._findTargetById(groupId);
             await room.del(contact);
         });
 
@@ -702,7 +717,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const room = await this._findTarget(groupId, 'SetRoomAnnouncement');
+            const room = await this._findTargetById(groupId);
             await room.announce(content);
         });
 
@@ -714,7 +729,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return
             }
 
-            const room = await this._findTarget(groupId, 'SetRoomName');
+            const room = await this._findTargetById(groupId);
             await room.topic(content);
         });
 
