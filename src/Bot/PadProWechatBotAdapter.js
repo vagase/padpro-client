@@ -59,8 +59,12 @@ class PadProWechatBotAdapter extends BotAdapter {
      */
     async _findContacts(query = {}) {
         // 因为 wechaty api 限制，不能通过 id 搜索 contact，特此添加通过 id 搜索 contact
-        const newQuery = Object.assign({}, query);
+        let newQuery = Object.assign({}, query);
         delete newQuery.id;
+
+        if (Object.keys(newQuery).length === 0) {
+            newQuery = null;
+        }
 
         let contacts = await this.wechatyBot.Contact.findAll(newQuery);
 
@@ -85,8 +89,12 @@ class PadProWechatBotAdapter extends BotAdapter {
     async _findRooms(query = {}) {
         // 因为 wechaty api 限制，不支持通过 id 搜索 room，特此添加通过 id 搜索 room。
 
-        const newQuery = Object.assign({}, query);
+        let newQuery = Object.assign({}, query);
         delete newQuery.id;
+
+        if (Object.keys(newQuery).length === 0) {
+            newQuery = null;
+        }
 
         let rooms = await this.wechatyBot.Room.findAll(newQuery);
 
@@ -547,7 +555,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             }
 
             const target = await this._findTargetById(toUserName);
-            await target.say(content)
+            await target.say(content);
         });
 
         this.registerHubAction("SendAppMessage", async (actionBody) => {

@@ -100,7 +100,7 @@ class BotClient extends EventEmitter {
         }
         else if (eventType === 'LOGOUT') {
             if (!this.botAdapter.isSignedIn()) {
-                await this._replyActionToHubWithError(eventType, body, 'Can not logout, because the bot is not signed on');
+                await this._replyActionToHub(eventType, body, null, 'Can not logout, because the bot is not signed on');
                 log.error(`Can not logout, because the bot is not signed on`);
                 return;
             }
@@ -109,7 +109,7 @@ class BotClient extends EventEmitter {
         }
         else {
             if (!this.botAdapter.isSignedIn()) {
-                await this._replyActionToHubWithError(eventType, body, 'Bot is not signed on, can not execute any action.');
+                await this._replyActionToHub(eventType, body, null, 'Bot is not signed on, can not execute any action.');
                 log.error(`[${eventType}] Bot is not signed on, can not execute any action: ${body}`);
                 return;
             }
@@ -136,16 +136,20 @@ class BotClient extends EventEmitter {
                 }
 
                 if (handled) {
+                    log.debug(`> response action to hub success: ${eventType} ${JSON.stringify(response)}`);
+
                     await this._replyActionToHub(eventType, body, response);
                 }
                 else {
-                    await this._replyActionToHubWithError(eventType, body, 'unhandled message');
+                    log.error(`> response action to hub fail: ${eventType} unhandled message`);
 
-                    log.info(`[${eventType}] unhandled message`);
+                    await this._replyActionToHub(eventType, body, 'unhandled message');
                 }
             }
             catch (e) {
-                await this._replyActionToHubWithError(eventType, body, e.toString());
+                log.error(`> response action to hub fail: ${eventType} ${e.toString()}`);
+
+                await this._replyActionToHub(eventType, body, e.toString());
             }
         }
     }
@@ -202,20 +206,24 @@ class BotClient extends EventEmitter {
         this.tunnel.write(newEventRequest(eventType, eventBody))
     }
 
-    _replyActionToHub(eventType, body, result) {
+    _replyActionToHub(eventType, originalEventBody, data, error) {
+        const result = {};
+        if (error) {
+            result.success = false;
+            result.error = error;
+        }
+        else {
+            result.success = true;
+            result.data = data;
+        }
+
         return this._sendEventToHub(
             'ACTIONREPLY',
             {
                 eventType: eventType,
-                body: body,
-                result: result
+                body: originalEventBody,
+                result
             });
-    }
-
-    _replyActionToHubWithError(eventType, body, error) {
-        return this._replyActionToHub(eventType, body, {
-            error
-        });
     }
 
     _startHubHeartBeat() {
