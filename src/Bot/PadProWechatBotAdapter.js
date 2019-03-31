@@ -123,6 +123,19 @@ class PadProWechatBotAdapter extends BotAdapter {
         return targets && targets[0];
     }
 
+    async _responseLoginDone() {
+        this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
+            userName: this.contactSelf.id
+        });
+
+        // 主动同步通讯录
+        await this.contactSelf.sync();
+        // 向服务器发送联系人列表
+        const allContacts = await this.wechatyBot.Contact.findAll() || [];
+        const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
+        await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
+    }
+
     _registerBotActions() {
         const _handleBotMessage = async (message) => {
             const MessageType = this.wechatyBot.Message.Type;
@@ -448,27 +461,9 @@ class PadProWechatBotAdapter extends BotAdapter {
 
                 this.contactSelf = userSelf;
 
-                this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
-                    userName: userSelf.id
-                });
-
                 await this._sendTextToFileHelper('已登录');
-
-
-                // 主动同步通讯录
-                await userSelf.sync();
-                // 向服务器发送联系人列表
-                const allContacts = await this.wechatyBot.Contact.findAll() || [];
-                const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
-                await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
-
+                await this._responseLoginDone();
                 await this._sendTextToFileHelper('已同步完成聊天室、通讯录');
-
-                const rooms = await this.wechatyBot.Room.findAll();
-                console.log(rooms);
-
-                const room = await this.wechatyBot.Room.find({topic: 'kol-explorer'});
-                console.log(room);
             })
 
             // emit when all data has load completed, in wechaty-puppet-padchat, it means it has sync Contact and Room completed
@@ -552,8 +547,6 @@ class PadProWechatBotAdapter extends BotAdapter {
             }
 
             const target = await this._findTargetById(toUserName);
-
-            // TODO: test, and other format message
             await target.say(content)
         });
 
@@ -856,10 +849,7 @@ class PadProWechatBotAdapter extends BotAdapter {
     async login(loginInfo) {
         // 重复登录，直接返回
         if (this.wechatyBot) {
-            this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
-                userName: this.contactSelf.id
-            });
-
+            await this._responseLoginDone();
             return;
         }
 
