@@ -852,6 +852,9 @@ class PadProWechatBotAdapter extends BotAdapter {
                         return this.decodeObject(member, BotAdapter.ObjectType.Contact);
                     }));
                 }
+                else {
+                    result['memberIdList'] = JSON.parse(result['memberIdList']);
+                }
 
                 return result;
             },
