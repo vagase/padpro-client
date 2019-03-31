@@ -783,7 +783,7 @@ class PadProWechatBotAdapter extends BotAdapter {
         this.registerHubAction("SetRoomAnnouncement", async (actionBody) => {
             let groupId = actionBody.groupId;
             let content = actionBody.content;
-            if (groupId === undefined || userId === undefined ) {
+            if (groupId === undefined || content === undefined ) {
                 log.error("set room announcement message empty")
                 return
             }

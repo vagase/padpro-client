@@ -165,7 +165,7 @@ class BotClient extends EventEmitter {
             catch (e) {
                 log.error(`> response action to hub fail: ${eventType} ${e.toString()}`);
 
-                await this._replyActionToHub(eventType, body, e.toString());
+                await this._replyActionToHub(eventType, body, null, e.toString());
             }
         }
     }
