@@ -58,6 +58,10 @@ class BotAdapter {
     async logout() {
     }
 
+    // 只有在登录情况下，register 之后就里面发送一个 logindone
+    async tryToSendLoginInfoToHub() {
+    }
+
     /**
      * 将各个 adapter 的队形 decode 为标准 json 数据格式
      * @param obj

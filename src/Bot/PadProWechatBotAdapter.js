@@ -9,6 +9,7 @@ const qrcode = require('qrcode');
 const moment = require('moment');
 const {parseXml} = require('./utils');
 const uuidv4  = require('uuid/v4');
+const {MemoryCard} = require('memory-card');
 
 class PadProWechatBotAdapter extends BotAdapter {
     constructor(token) {
@@ -25,7 +26,7 @@ class PadProWechatBotAdapter extends BotAdapter {
         this._setupObjectDecoders();
     }
 
-    _newWechatyBot() {
+    async _newWechatyBot(loginInfo) {
         // const puppet = new PuppetPadpro({
         //     token: this.token,
         // });
@@ -34,11 +35,32 @@ class PadProWechatBotAdapter extends BotAdapter {
         //     puppet
         // });
 
+        let memory = null;
+
+        if (loginInfo) {
+            const currentUserId = loginInfo.userId;
+
+            memory = new MemoryCard();
+            await memory.load();
+            const puppetMemory = memory.multiplex('puppet');
+            await puppetMemory.set('WECHATY_PUPPET_PADCHAT', {
+                currentUserId: currentUserId,
+                device: {
+                    [currentUserId]: {
+                        data: loginInfo.wxData,
+                        token: loginInfo.token
+                    }
+                }
+            });
+        }
+
+
         return new Wechaty({
             puppet: 'wechaty-puppet-padchat',
             puppetOptions: {
                 token: 'puppet_padchat_a8f8e6a2b9463ee8',
             },
+            memory
         });
     }
 
@@ -132,8 +154,16 @@ class PadProWechatBotAdapter extends BotAdapter {
     }
 
     async _responseLoginDone() {
+        const userId = this.contactSelf.id;
+
+        const loginPayload = this.wechatyBot.memory.payload;
+        const key = Object.keys(loginPayload)[0];
+        const deviceInfo = loginPayload[key]['device'][userId];
+
         this.sendHubEvent(BotAdapter.HubEvent.LOGIN_DONE, {
-            userName: this.contactSelf.id
+            userName: userId,
+            token: deviceInfo.token,
+            wxData: deviceInfo.data
         });
 
         // 主动同步通讯录
@@ -867,6 +897,15 @@ class PadProWechatBotAdapter extends BotAdapter {
         return this.wechatyBot && this.wechatyBot.logonoff();
     }
 
+    /**
+     * @param loginInfo
+     * {
+     *      userId: '',
+     *      token: '',
+     *      wxData: ''
+     * }
+     * @return {Promise<*>}
+     */
     async login(loginInfo) {
         // 重复登录，直接返回
         if (this.wechatyBot) {
@@ -874,7 +913,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             return;
         }
 
-        this.wechatyBot = this._newWechatyBot();
+        this.wechatyBot = await this._newWechatyBot(loginInfo);
 
         this._registerBotActions();
 
@@ -888,6 +927,14 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         await this.wechatyBot.logout();
         this.wechatyBot = null;
+    }
+
+    async tryToSendLoginInfoToHub() {
+        if (!this.wechatyBot) {
+            return;
+        }
+
+        await this._responseLoginDone();
     }
 }
 

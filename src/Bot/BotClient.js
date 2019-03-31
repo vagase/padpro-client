@@ -23,6 +23,16 @@ class BotClient extends EventEmitter {
         this._setupBotAdapter();
 
         this.running = false;
+
+        /**
+         * loginInfo:
+         * {
+         *     userId: '',
+         *     token: '',
+         *     wxData: ''
+         * }
+         * @type {null}
+         */
         this.loginInfo = null;
         this.botId = null;
         this.tunnel = null;
@@ -71,7 +81,13 @@ class BotClient extends EventEmitter {
 
         if (loginBody.loginInfo.length > 0) {
             try {
-                this.loginInfo = JSON.parse(loginBody.loginInfo);
+                const loginInfo = JSON.parse(loginBody.loginInfo);
+                if (Object.keys(loginInfo).length > 0) {
+                    loginInfo.userId = loginBody.login;
+
+                    this.loginInfo = loginInfo;
+                }
+
             }
             catch (e) {
                 console.error('login info is not json format: ');
@@ -273,6 +289,8 @@ class BotClient extends EventEmitter {
 
         // Register client with hub instantly.
         await this._sendEventToHub("REGISTER", "HELLO");
+
+        await this.botAdapter.tryToSendLoginInfoToHub();
 
         this._startHubHeartBeat();
     }
