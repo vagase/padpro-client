@@ -230,7 +230,7 @@ class BotClient extends EventEmitter {
         }
         else {
             result.success = true;
-            result.data = data;
+            result.data = Object.assign({status: 0}, data);
         }
 
         return this._sendEventToHub(

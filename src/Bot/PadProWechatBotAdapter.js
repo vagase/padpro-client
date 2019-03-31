@@ -92,7 +92,15 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         if (query.id) {
             contacts =  contacts.filter(contact => {
-                return contact.id === query.id;
+                if (query.id instanceof RegExp) {
+                    return query.id.test(contact.id);
+                }
+                else if (Array.isArray(query.id)) {
+                    return query.id.indexOf(contact.id) !== -1;
+                }
+                else {
+                    return contact.id === query.id;
+                }
             });
         }
 
@@ -122,7 +130,16 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         if (query.id) {
             rooms = rooms.filter(room => {
-                return room.id === query.id;
+
+                if (query.id instanceof RegExp) {
+                    return query.id.test(room.id);
+                }
+                else if (Array.isArray(query.id)) {
+                    return query.id.indexOf(room.id) !== -1;
+                }
+                else {
+                    return room.id === query.id;
+                }
             });
         }
 
@@ -584,8 +601,13 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return;
             }
 
+            let atContacts = null;
+            if (atList && atList.length > 0) {
+                atContacts = await this._findContacts({id: atList});
+            }
+
             const target = await this._findTargetById(toUserName);
-            await target.say(content);
+            await target.say(content, atContacts);
         });
 
         this.registerHubAction("SendAppMessage", async (actionBody) => {
@@ -683,13 +705,18 @@ class PadProWechatBotAdapter extends BotAdapter {
         this.registerHubAction("CreateRoom", async (actionBody) => {
             let userList = actionBody.userList;
             log.info("create room userlist %o", userList)
-            if (userList === undefined) {
+            if (!userList || userList.length === 0) {
                 log.error("create room message empty")
                 return
             }
 
-            const contacts = await this._findContacts({name: new RegExp(userList.join('|'))});
-            await this.wechatyBot.Room.create(contacts, '');
+            const contacts = await this._findContacts({id: new RegExp('^('+ userList.join('|') + ')$')});
+            const roomCreated = await this.wechatyBot.Room.create(contacts);
+
+            return {
+                userName: roomCreated.id,
+                status: 0
+            };
         });
 
         this.registerHubAction("GetRoomMembers", async (actionBody) => {
@@ -766,9 +793,9 @@ class PadProWechatBotAdapter extends BotAdapter {
         });
 
         this.registerHubAction("SetRoomName", async (actionBody) => {
-            let groupId = actionBody.groupId
-            let content = actionBody.content
-            if (groupId === undefined || userId === undefined ) {
+            let groupId = actionBody.groupId;
+            let content = actionBody.content;
+            if (groupId === undefined || content === undefined ) {
                 log.error("set room name message empty")
                 return
             }
