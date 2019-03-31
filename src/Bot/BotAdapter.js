@@ -70,7 +70,7 @@ class BotAdapter {
      * - fullfill: 是否将相关 object 都填充，比如 message 的 from, to, room
      * @return {*}
      */
-    decodeObject(obj, objectType, options = {}) {
+    async decodeObject(obj, objectType, options = {}) {
         if (!obj) {
             return null;
         }
@@ -92,7 +92,8 @@ BotAdapter.HubEvent = {
     MESSAGE: 'MESSAGE',
     IMAGEMESSAGE: 'IMAGEMESSAGE',
     EMOJIMESSAGE: 'EMOJIMESSAGE',
-    CONTACTLIST: 'CONTACTLIST'
+    CONTACTLIST: 'CONTACTLIST',
+    GROUPLIST: 'GROUPLIST'
 };
 
 BotAdapter.ObjectType = {

@@ -185,10 +185,16 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         // 主动同步通讯录
         await this.contactSelf.sync();
+
         // 向服务器发送联系人列表
-        const allContacts = await this.wechatyBot.Contact.findAll() || [];
-        const allContactsPayload = allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact));
+        const allContacts = (await this.wechatyBot.Contact.findAll()) || [];
+        const allContactsPayload = await Promise.all(allContacts.map(contact => this.decodeObject(contact, BotAdapter.ObjectType.Contact)));
         await this.sendHubEvent(BotAdapter.HubEvent.CONTACTLIST, allContactsPayload);
+
+        // 向服务器发送聊天室列表
+        const allRooms = (await this.wechatyBot.Room.findAll()) || [];
+        const allRoomsPayload = await Promise.all(allRooms.map(room => this.decodeObject(room, BotAdapter.ObjectType.Room)));
+        await this.sendHubEvent(BotAdapter.HubEvent.GROUPLIST, allRoomsPayload);
     }
 
     _registerBotActions() {
@@ -205,8 +211,8 @@ class PadProWechatBotAdapter extends BotAdapter {
                     payload['groupId'] = await message.room().id;
                     payload['groupName'] = await message.room().topic();
 
-                    const mentions = await message.mention();
-                    const mentionsContacts = mentions && mentions.map(m => this.decodeObject(m, BotAdapter.ObjectType.Contact)) || [];
+                    const mentions = await message.mention() || [];
+                    const mentionsContacts = await Promise.all(mentions.map(m => this.decodeObject(m, BotAdapter.ObjectType.Contact)));
                     if (mentionsContacts.length) {
                         payload['atList'] = mentionsContacts;
                     }
@@ -546,10 +552,10 @@ class PadProWechatBotAdapter extends BotAdapter {
             })
 
             // emit when someone sends bot a friend request
-            .on('friendship', (friendship) => {
+            .on('friendship', async (friendship) => {
                 log.debug(`on friendship: ${friendship}`);
 
-                const payload = this.decodeObject(friendship, BotAdapter.ObjectType.Friendship );
+                const payload = await this.decodeObject(friendship, BotAdapter.ObjectType.Friendship );
                 this.sendHubEvent(BotAdapter.HubEvent.FRIEND_REQUEST, payload);
             })
 
@@ -818,7 +824,7 @@ class PadProWechatBotAdapter extends BotAdapter {
 
     _setupObjectDecoders() {
         this.objectDecoders = {
-            [BotAdapter.ObjectType.Room]: (room, options) => {
+            [BotAdapter.ObjectType.Room]: async (room, options) => {
                 /**
                  {
                   "id": "12117117522@chatroom",
@@ -832,8 +838,19 @@ class PadProWechatBotAdapter extends BotAdapter {
 
                 const result = Object.assign({}, room.payload);
 
-                if (!options.fullfill) {
+                if (options.fullfill) {
+                    const ownerId = result['ownerId'];
+                    const memberIdList = JSON.parse(result['memberIdList']);
+
+                    delete result['ownerId'];
                     delete result['memberIdList'];
+
+                    const owner = await this._findTargetById(ownerId);
+                    result.owner = await this.decodeObject(owner, BotAdapter.ObjectType.Contact);
+                    result.members = await Promise.all(memberIdList.map(async memberId => {
+                        const member = await this._findTargetById(memberId);
+                        return this.decodeObject(member, BotAdapter.ObjectType.Contact);
+                    }));
                 }
 
                 return result;
@@ -857,7 +874,7 @@ class PadProWechatBotAdapter extends BotAdapter {
                 return Object.assign({}, contact.payload);
             },
 
-            [BotAdapter.ObjectType.Friendship]: (friendship, options) => {
+            [BotAdapter.ObjectType.Friendship]: async (friendship, options) => {
                 /**
                 {
                     "domain": null,
@@ -877,13 +894,13 @@ class PadProWechatBotAdapter extends BotAdapter {
                 const payload = Object.assign({}, friendship.payload);
 
                 if (options.fullfill) {
-                    payload.contact = this.decodeObject(friendship.contact(), BotAdapter.ObjectType.Contact);
+                    payload.contact = await this.decodeObject(friendship.contact(), BotAdapter.ObjectType.Contact);
                 }
 
                 return payload;
             },
 
-            [BotAdapter.ObjectType.Message]: (message, options) => {
+            [BotAdapter.ObjectType.Message]: async (message, options) => {
                 /*
                 {
                   "id": "2724616628474814304",
@@ -902,9 +919,9 @@ class PadProWechatBotAdapter extends BotAdapter {
                 const messagePayload = Object.assign({}, message.payload);
 
                 if (options.fullfill) {
-                    const from = this.decodeObject(message.from(), BotAdapter.ObjectType.Contact);
-                    const to = this.decodeObject(message.to(), BotAdapter.ObjectType.Contact);
-                    const room = this.decodeObject(message.room(), BotAdapter.ObjectType.Room);
+                    const from = await this.decodeObject(message.from(), BotAdapter.ObjectType.Contact);
+                    const to = await this.decodeObject(message.to(), BotAdapter.ObjectType.Contact);
+                    const room = await this.decodeObject(message.room(), BotAdapter.ObjectType.Room);
 
                     messagePayload['from'] = from;
                     messagePayload['to'] = to;
