@@ -819,6 +819,16 @@ class PadProWechatBotAdapter extends BotAdapter {
 
             return this.contactSelf.qrcode();
         });
+
+        this.registerHubAction("SearchContact", async (actionBody) => {
+            const userId = actionBody.userId;
+            if (userId === undefined || userId === null) {
+                throw "search contact: userId is not supplied."
+            }
+
+            const contact = await this._findTargetById(userId);
+            return this.decodeObject(contact, BotAdapter.ObjectType.Contact);
+        });
     }
 
     _setupObjectDecoders() {
