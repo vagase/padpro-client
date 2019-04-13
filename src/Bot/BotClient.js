@@ -104,6 +104,8 @@ class BotClient extends EventEmitter {
         const clientId = event.getClientid();
         const clientType = event.getClienttype();
 
+        const startTime = new Date();
+
         if (eventType === 'PONG') {
             !mutePingPongLog && log.debug("PONG " + clientType + " " + clientId);
             return;
@@ -130,8 +132,6 @@ class BotClient extends EventEmitter {
                 return;
             }
 
-            log.debug(`> handle event from hub: ${eventType} ${body}`);
-
             try {
                 let response = null;
                 let handled = false;
@@ -151,19 +151,22 @@ class BotClient extends EventEmitter {
                     response = await this.botAdapter.handleHubAction(actionType, actionBody);
                 }
 
+                const cost = (new Date()) - startTime;
+
                 if (handled) {
-                    log.debug(`> response action to hub success: ${eventType} ${JSON.stringify(response)}`);
+                    log.debug(`> handel event from hub: ${eventType} ${body } [${cost}ms], success: ${JSON.stringify(response)}`);
 
                     await this._replyActionToHub(eventType, body, response);
                 }
                 else {
-                    log.error(`> response action to hub fail: ${eventType} unhandled message`);
+                    log.error(`> handel event from hub: ${eventType} ${body} [${cost}ms], fail: unhandled message`);
 
                     await this._replyActionToHub(eventType, body, 'unhandled message');
                 }
             }
             catch (e) {
-                log.error(`> response action to hub fail: ${eventType} ${e.toString()}`);
+                const cost = (new Date()) - startTime;
+                log.error(`> handel event from hub: ${eventType} ${body} [${cost}ms], fail: ${e.toString()}`);
 
                 await this._replyActionToHub(eventType, body, null, e.toString());
             }

@@ -712,8 +712,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let userList = actionBody.userList;
             log.info("create room userlist %o", userList)
             if (!userList || userList.length === 0) {
-                log.error("create room message empty")
-                return
+                throw "create room message empty";
             }
 
             const contacts = await this._findContacts({id: new RegExp('^('+ userList.join('|') + ')$')});
