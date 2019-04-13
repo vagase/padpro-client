@@ -808,8 +808,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let groupId = actionBody.groupId;
             let content = actionBody.content;
             if (groupId === undefined || content === undefined ) {
-                log.error("set room name message empty")
-                return
+                throw "set room name message empty";
             }
 
             const room = await this._findTargetById(groupId);
