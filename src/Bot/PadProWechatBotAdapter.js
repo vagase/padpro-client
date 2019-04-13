@@ -673,15 +673,13 @@ class PadProWechatBotAdapter extends BotAdapter {
 
         this.registerHubAction("AddContact", async (actionBody) => {
             let stranger = actionBody.stranger;
-            let ticket = actionBody.ticket;
-            let type = actionBody.type;
             let content = actionBody.content;
-            if (stranger === undefined || ticket === undefined || type === undefined) {
-                log.error("add contact message empty")
-                return
+
+            if (stranger === undefined ) {
+                throw "add contact: stranger is not supplied";
             }
 
-            const contact = await this._findTargetById(stranger);
+            const contact = this.wechatyBot.Contact.load(stranger);
             await this.wechatyBot.Friendship.add(contact, content);
         });
 
