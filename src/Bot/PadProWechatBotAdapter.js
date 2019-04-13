@@ -683,6 +683,17 @@ class PadProWechatBotAdapter extends BotAdapter {
             await this.wechatyBot.Friendship.add(contact, content);
         });
 
+        this.registerHubAction("DeleteContact", async (actionBody) => {
+            const userId = actionBody;
+            if (userId === undefined) {
+                throw "delete contact: user id is not supplied";
+            }
+
+            // FIXME: wechaty 暂时不支持删除好友
+
+            // await this.wechatyBot.Contact.
+        });
+
         this.registerHubAction("SayHello", async (actionBody) => {
             let stranger = actionBody.stranger;
             let ticket = actionBody.ticket;
