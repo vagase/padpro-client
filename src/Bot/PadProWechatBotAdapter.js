@@ -784,8 +784,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let groupId = actionBody.groupId;
             let userId = actionBody.userId;
             if (groupId === undefined || userId === undefined ) {
-                log.error("delete room member message empty")
-                return
+                throw "delete room member message empty";
             }
 
             const contact = await this._findTargetById(userId);
