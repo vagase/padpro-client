@@ -760,8 +760,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let groupId = actionBody.groupId;
             let userId = actionBody.userId;
             if (groupId === undefined || userId === undefined ) {
-                log.error("add room member message empty")
-                return;
+                throw "add room member message empty";
             }
 
             const contact = await this._findTargetById(userId);
@@ -773,8 +772,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let groupId = actionBody.groupId;
             let userId = actionBody.userId;
             if (groupId === undefined || userId === undefined ) {
-                log.error("invite room member message empty")
-                return
+                throw "invite room member message empty";
             }
 
             const contact = await this._findTargetById(userId);
