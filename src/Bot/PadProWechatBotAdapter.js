@@ -819,8 +819,7 @@ class PadProWechatBotAdapter extends BotAdapter {
             let userId = actionBody.userId
             let style = actionBody.style
             if (userId === undefined || style === undefined) {
-                log.error("get contact qrcode message empty")
-                return
+                throw "get contact qrcode message empty";
             }
 
             return this.contactSelf.qrcode();
@@ -868,7 +867,14 @@ class PadProWechatBotAdapter extends BotAdapter {
                     }));
                 }
                 else {
-                    result['memberIdList'] = JSON.parse(result['memberIdList']);
+                    try {
+                        if (typeof result['memberIdList'] === 'string') {
+                            result['memberIdList'] = JSON.parse(result['memberIdList']);
+                        }
+                    }
+                    catch (e) {
+
+                    }
                 }
 
                 return result;
