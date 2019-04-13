@@ -741,7 +741,8 @@ class PadProWechatBotAdapter extends BotAdapter {
             }
 
             const room = await this._findTargetById(groupId);
-            return room.memberAll();
+            const contacts = await room.memberAll();
+            return await Promise.all(contacts.map(async (contact) =>  this.decodeObject(contact, BotAdapter.ObjectType.Contact)));
         });
 
         this.registerHubAction("GetRoomQRCode", async (actionBody) => {
